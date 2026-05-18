@@ -10,7 +10,12 @@ export async function GET(request, { params }) {
     if (!data.title && data.servers.length === 0) {
       return Response.json({ success: false, error: 'Episode not found' }, { status: 404 });
     }
-    return Response.json({ success: true, data });
+    return new Response(JSON.stringify({ success: true, data }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400',
+      },
+    });
   } catch (error) {
     return Response.json({ success: false, error: error.message }, { status: 500 });
   }

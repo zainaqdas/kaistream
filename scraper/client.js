@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { scraperCache } from './cache.js';
 
 const BASE_URL = 'https://anikototv.to';
 
@@ -12,40 +13,46 @@ const defaultHeaders = {
 
 // For full page HTML (no baseURL needed since paths may point to different domains)
 async function fetchHTML(path, queryParams = {}) {
-  const fullPath = path.startsWith('http') ? path : `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
-  const { data } = await axios.get(fullPath, {
-    params: queryParams,
-    headers: defaultHeaders,
-    timeout: 15000,
-    maxRedirects: 5,
+  return scraperCache.getOrFetch('html', path, queryParams, async () => {
+    const fullPath = path.startsWith('http') ? path : `${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`;
+    const { data } = await axios.get(fullPath, {
+      params: queryParams,
+      headers: defaultHeaders,
+      timeout: 15000,
+      maxRedirects: 5,
+    });
+    return data;
   });
-  return data;
 }
 
 // For JSON API endpoints on anikototv.to
 async function fetchJSON(path, params = {}) {
-  const { data } = await axios.get(`${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, {
-    params,
-    headers: {
-      ...defaultHeaders,
-      'X-Requested-With': 'XMLHttpRequest',
-      'Accept': 'application/json, text/plain, */*',
-    },
-    timeout: 15000,
+  return scraperCache.getOrFetch('json', path, params, async () => {
+    const { data } = await axios.get(`${BASE_URL}${path.startsWith('/') ? path : `/${path}`}`, {
+      params,
+      headers: {
+        ...defaultHeaders,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'application/json, text/plain, */*',
+      },
+      timeout: 15000,
+    });
+    return data;
   });
-  return data;
 }
 
 // For external JSON APIs (like the mapper)
 async function fetchExternalJSON(url) {
-  const { data } = await axios.get(url, {
-    headers: {
-      'User-Agent': defaultHeaders['User-Agent'],
-      'Accept': 'application/json, text/plain, */*',
-    },
-    timeout: 15000,
+  return scraperCache.getOrFetch('external', url, {}, async () => {
+    const { data } = await axios.get(url, {
+      headers: {
+        'User-Agent': defaultHeaders['User-Agent'],
+        'Accept': 'application/json, text/plain, */*',
+      },
+      timeout: 15000,
+    });
+    return data;
   });
-  return data;
 }
 
 export { fetchHTML, fetchJSON, fetchExternalJSON, BASE_URL };

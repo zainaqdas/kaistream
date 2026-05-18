@@ -40,9 +40,14 @@ export async function GET() {
       }
     });
 
-    return Response.json({
+    return new Response(JSON.stringify({
       success: true,
       data: { genres, types, statuses },
+    }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
     });
   } catch (error) {
     return Response.json({ success: false, error: error.message }, { status: 500 });
