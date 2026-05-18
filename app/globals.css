@@ -1,20 +1,20 @@
 :root {
-  --bg-primary: #0b1421;
-  --bg-secondary: #111d2e;
-  --bg-card: #162032;
-  --bg-hover: #1c2a42;
+  --bg-primary: #0a0f1a;
+  --bg-secondary: #0f1a1e;
+  --bg-card: #0f1f1a;
+  --bg-hover: #162922;
   --text-primary: #e8edf5;
   --text-secondary: #8899b0;
   --text-muted: #5a6a82;
-  --accent: #4f8fff;
-  --accent-hover: #6ba3ff;
-  --accent-glow: rgba(79, 143, 255, 0.15);
-  --border: #1e2d45;
-  --border-light: #2a3d5c;
+  --accent: #10b981;
+  --accent-hover: #34d399;
+  --accent-glow: rgba(16, 185, 129, 0.15);
+  --border: #1a2e28;
+  --border-light: #234a3a;
   --rating: #ffc107;
   --sub-color: #4fc3f7;
   --dub-color: #ff8a65;
-  --success: #66bb6a;
+  --success: #10b981;
   --danger: #ef5350;
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -141,16 +141,19 @@ input {
 .logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 22px;
-  font-weight: 800;
-  color: var(--accent);
-  letter-spacing: -0.5px;
   flex-shrink: 0;
 }
 
-.logo span {
-  color: var(--text-primary);
+.logo-img {
+  height: 44px;
+  width: auto;
+  display: block;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.logo:hover .logo-img {
+  transform: scale(1.04);
+  filter: brightness(1.08) drop-shadow(0 0 8px rgba(16, 185, 129, 0.25));
 }
 
 .header-search {
@@ -666,12 +669,12 @@ input {
 .btn-primary {
   background: var(--accent);
   color: #fff;
-  box-shadow: 0 4px 16px rgba(79, 143, 255, 0.3);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
-  box-shadow: 0 6px 24px rgba(79, 143, 255, 0.4);
+  box-shadow: 0 6px 24px rgba(16, 185, 129, 0.4);
   transform: translateY(-1px);
 }
 
@@ -867,14 +870,14 @@ input {
   font-weight: 500;
   padding: 4px 10px;
   border-radius: 4px;
-  background: rgba(79, 143, 255, 0.12);
+  background: rgba(16, 185, 129, 0.12);
   color: var(--accent);
-  border: 1px solid rgba(79, 143, 255, 0.2);
+  border: 1px solid rgba(16, 185, 129, 0.2);
   transition: var(--transition);
 }
 
 .genre-tag:hover {
-  background: rgba(79, 143, 255, 0.2);
+  background: rgba(16, 185, 129, 0.2);
 }
 
 .anime-detail-synopsis {
@@ -927,7 +930,7 @@ input {
 
 .episode-btn.is-active {
   border-color: var(--accent);
-  background: rgba(79, 143, 255, 0.15);
+  background: rgba(16, 185, 129, 0.15);
   color: var(--accent);
 }
 

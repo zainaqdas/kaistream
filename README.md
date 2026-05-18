@@ -1,6 +1,6 @@
-# Kaistream — Anime Streaming App
+# KaiStream — Anime Streaming App
 
-A **Next.js 14** anime streaming application that scrapes data from anikototv.to and serves it through a clean UI with API endpoints.
+A **Next.js 14** anime streaming application with a clean UI and a full API built on scraped data.
 
 Built with the Next.js App Router, React components, and a scraper layer using Axios + Cheerio.
 
@@ -11,6 +11,7 @@ Built with the Next.js App Router, React components, and a scraper layer using A
 - 📺 **Anime Detail** — Full info, synopsis, genres, episode list
 - 🎬 **Watch / Player** — Iframe video player with server selector (Vidstream, VidCloud, Kiwi Stream)
 - 📂 **API** — 7 endpoints for programmatic access
+- 📈 **Browse** — Browse by genre, type, status, trending, latest, new releases
 
 ## Tech Stack
 
@@ -65,7 +66,10 @@ kaistream/
 ├── app/
 │   ├── layout.jsx              # Root layout (Header + Footer + global styles)
 │   ├── page.jsx                # Home page (hero + latest + trending)
-│   ├── globals.css             # Global styles (dark theme, responsive)
+│   ├── globals.css             # Global styles (emerald dark theme, responsive)
+│   ├── browse/
+│   │   └── [...params]/
+│   │       └── page.jsx        # Browse results (genre, type, status, trending)
 │   ├── anime/
 │   │   └── [slug]/
 │   │       └── page.jsx        # Anime detail page (poster, info, episodes)
@@ -84,12 +88,12 @@ kaistream/
 │       ├── browse/[...params]/route.js        # Browse by genre/type/status (cached 10 min)
 │       └── filters/route.js    # Available filters (cached 1 hour)
 ├── components/
-│   ├── Header.jsx              # Navigation + search bar
+│   ├── Header.jsx              # Navigation + search bar + browse dropdown
 │   ├── Hero.jsx                # Hero carousel with auto-slide
 │   ├── AnimeCard.jsx           # Anime card with thumbnail + badges
 │   ├── EpisodeGrid.jsx         # Episode number grid
 │   ├── Player.jsx              # Iframe video player + server tabs
-│   └── Footer.jsx              # Footer with attribution
+│   └── Footer.jsx              # Footer
 ├── lib/
 │   └── api.js                  # Client-side API helper functions
 ├── scraper/
@@ -179,7 +183,7 @@ curl "http://localhost:3000/api/search?q=naruto"
       {
         "title": "Naruto Shippuden",
         "slug": "naruto-shippuden-c8gov",
-        "episodeUrl": "https://anikototv.to/watch/naruto-shippuden-c8gov",
+        "episodeUrl": ".../watch/naruto-shippuden-c8gov",
         "thumbnail": "https://cdn.anipixcdn.co/...",
         "episodes": { "sub": 500, "dub": 500, "total": 500 },
         "type": "TV"
@@ -227,7 +231,7 @@ curl "http://localhost:3000/api/anime/solo-leveling-ilh08"
         "ids": "V2U2akpZ...",
         "hasSub": true,
         "hasDub": true,
-        "url": "https://anikototv.to/watch/solo-leveling-ilh08/ep-1"
+        "url": ".../watch/solo-leveling-ilh08/ep-1"
       }
     ],
     "totalEpisodes": 12
@@ -343,4 +347,4 @@ GET /api/health
 
 ## License
 
-This project is for educational purposes only. All content is sourced from anikototv.to.
+This project is for educational purposes only.

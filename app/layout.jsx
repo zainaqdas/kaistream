@@ -4,9 +4,13 @@ import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 
 export const metadata = {
-  title: 'AnikotoTV - Watch Anime Online, Free Anime Streaming',
+  title: 'KaiStream - Watch Anime Online, Free Anime Streaming',
   description:
-    'AnikotoTV is a free anime streaming site. Watch anime online in HD quality with English sub or dub.',
+    'KaiStream is a free anime streaming site. Watch anime online in HD quality with English sub or dub.',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({ children }) {

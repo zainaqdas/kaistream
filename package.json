@@ -1,7 +1,7 @@
 {
-  "name": "anikoto-tv",
+  "name": "kaistream",
   "version": "1.0.0",
-  "description": "Anime streaming app - Next.js frontend + scraper API",
+  "description": "KaiStream - Anime streaming app (Next.js + scraper API)",
   "type": "module",
   "scripts": {
     "dev": "next dev",

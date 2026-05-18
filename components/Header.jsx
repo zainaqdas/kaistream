@@ -93,7 +93,7 @@ export default function Header() {
       <div className="container">
         <div className="header-inner">
           <Link href="/" className="logo">
-            Anikoto<span>TV</span>
+            <img src="/logo.svg" alt="KaiStream" className="logo-img" />
           </Link>
 
           <nav className="header-nav" ref={menuRef}>
