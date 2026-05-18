@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getEpisodeSources, getAnimeDetail } from '@/lib/api';
 import Player from '@/components/Player';
@@ -14,6 +14,8 @@ export default function WatchPage() {
   const [data, setData] = useState(null);
   const [animeData, setAnimeData] = useState(null);
   const [error, setError] = useState(null);
+  const [sortAsc, setSortAsc] = useState(false);
+  const [epSearch, setEpSearch] = useState('');
 
   useEffect(() => {
     if (!slug || !episode) return;
@@ -31,6 +33,58 @@ export default function WatchPage() {
       })
       .catch((err) => setError(err.message));
   }, [slug, episode]);
+
+  // When data loads, jump to the page containing the current episode
+  const epNum = parseInt(episode);
+
+  const episodes = useMemo(() => {
+    if (!animeData?.episodes?.length) return [];
+    const sorted = [...animeData.episodes];
+    // Sort by episode number asc/desc
+    sorted.sort((a, b) => {
+      const aNum = a.episode || a.number || 0;
+      const bNum = b.episode || b.number || 0;
+      return sortAsc ? aNum - bNum : bNum - aNum;
+    });
+    return sorted;
+  }, [animeData, sortAsc]);
+
+
+  // Filter episodes by search query
+  const filteredEpisodes = useMemo(() => {
+    if (!epSearch.trim()) return episodes;
+    const query = epSearch.trim();
+    return episodes.filter((ep) => {
+      const eNum = String(ep.episode || ep.number || '');
+      return eNum.includes(query);
+    });
+  }, [episodes, epSearch]);
+
+  const visibleEpisodes = epSearch.trim() ? filteredEpisodes : episodes;
+
+  const prevEp =
+    epNum > 1 ? epNum - 1 : null;
+  const nextEp =
+    animeData && animeData.totalEpisodes > epNum ? epNum + 1 : null;
+
+  const router = useRouter();
+
+  // Clear search and jump to target episode
+  const handleEpSearchSubmit = (e) => {
+    e.preventDefault();
+    const val = epSearch.trim();
+    if (!val) return;
+    const targetNum = parseInt(val, 10);
+    if (!isNaN(targetNum)) {
+      const idx = episodes.findIndex(
+        (ep) => String(ep.episode || ep.number) === String(targetNum)
+      );
+      if (idx !== -1) {
+        setEpSearch('');
+        router.push(`/watch/${slug}/${targetNum}`);
+      }
+    }
+  };
 
   if (error) {
     return (
@@ -52,11 +106,6 @@ export default function WatchPage() {
       </div>
     );
   }
-
-  const epNum = parseInt(episode);
-  const prevEp = epNum > 1 ? epNum - 1 : null;
-  const nextEp =
-    animeData && animeData.totalEpisodes > epNum ? epNum + 1 : null;
 
   return (
     <div className="watch-page">
@@ -108,28 +157,62 @@ export default function WatchPage() {
         {/* Right: Episode sidebar */}
         <aside className="watch-sidebar">
           <div className="watch-sidebar-header">
-            <h3>
-              Episodes <span className="text-muted">({animeData?.totalEpisodes || '...'})</span>
-            </h3>
+            <div className="watch-sidebar-header-top">
+              <h3>
+                Episodes <span className="text-muted">({animeData?.totalEpisodes || '...'})</span>
+              </h3>
+              <button
+                className="watch-sidebar-sort"
+                onClick={() => setSortAsc(!sortAsc)}
+                title={sortAsc ? 'Oldest first' : 'Newest first'}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 5h10M11 9h7M11 13h4" />
+                  <path d="M3 4l4 4-4 4" />
+                </svg>
+                {sortAsc ? 'Oldest' : 'Newest'}
+              </button>
+            </div>
+            <form className="watch-sidebar-search" onSubmit={handleEpSearchSubmit}>
+              <svg className="watch-sidebar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>                <input
+                type="text"
+                placeholder="Search episode #..."
+                value={epSearch}
+                onChange={(e) => setEpSearch(e.target.value)}
+              />
+              {epSearch && (
+                <button
+                  type="button"
+                  className="watch-sidebar-search-clear"
+                  onClick={() => setEpSearch('')}
+                >
+                  ✕
+                </button>
+              )}
+            </form>
           </div>
+
           <div className="watch-sidebar-list">
-            {animeData?.episodes?.length > 0 ? (
-              animeData.episodes.map((ep) => {
-                const epNum = ep.episode || ep.number;
-                const isActive = String(epNum) === String(episode);
+            {visibleEpisodes.length > 0 ? (
+              visibleEpisodes.map((ep) => {
+                const eNum = ep.episode || ep.number;
+                const isActive = String(eNum) === String(episode);
 
                 return (
                   <Link
-                    key={ep.slug || epNum}
-                    href={`/watch/${slug}/${epNum}`}
+                    key={ep.slug || eNum}
+                    href={`/watch/${slug}/${eNum}`}
                     className={`watch-sidebar-ep ${isActive ? 'is-active' : ''}`}
                   >
                     <span className="watch-sidebar-ep-num">
-                      {String(epNum).padStart(2, '0')}
+                      {String(eNum).padStart(2, '0')}
                     </span>
                     <div className="watch-sidebar-ep-info">
                       <span className="watch-sidebar-ep-title">
-                        {ep.title || `Episode ${epNum}`}
+                        {ep.title || `Episode ${eNum}`}
                       </span>
                       <div className="watch-sidebar-ep-badges">
                         {ep.hasSub && <span className="ep-badge sub">SUB</span>}
@@ -141,10 +224,17 @@ export default function WatchPage() {
               })
             ) : (
               <div className="empty-state" style={{ padding: '20px 0' }}>
-                No episodes available.
+                {epSearch.trim() ? 'No episodes match your search.' : 'No episodes available.'}
               </div>
             )}
           </div>
+
+          {epSearch.trim() && filteredEpisodes.length > 0 && (
+            <div className="watch-sidebar-search-count">
+              {filteredEpisodes.length} episode{filteredEpisodes.length !== 1 ? 's' : ''} found
+            </div>
+          )}
+
         </aside>
       </div>
     </div>
