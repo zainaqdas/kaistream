@@ -1,3 +1,4 @@
+import { getCached, setCached } from '@/lib/cache';
 import { getAnimeDetailGQL } from '@/lib/anilist';
 import { getCachedSlug, resolveSlug } from '@/lib/slug-resolver';
 import { scrapeEpisodeSources } from '@/scraper/scraper';
@@ -43,7 +44,14 @@ export async function GET(
       );
     }
 
-    const data = await scrapeEpisodeSources(anikotoSlug, episode);
+    // Check Redis cache first, then scrape if not found
+    const cachedSources = await getCached<EpisodeSources>('scraper.sources', { slug: anikotoSlug, episode }, 6 * 60 * 60 * 1000);
+    const data = cachedSources.found
+      ? cachedSources.data
+      : await scrapeEpisodeSources(anikotoSlug, episode);
+    if (!cachedSources.found) {
+      await setCached('scraper.sources', { slug: anikotoSlug, episode }, data, 6 * 60 * 60 * 1000);
+    }
     if (!data.title && data.servers.length === 0) {
       return Response.json(
         { success: false, error: 'Episode not found' } as { success: false; error: string },

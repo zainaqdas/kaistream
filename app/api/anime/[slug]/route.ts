@@ -1,3 +1,4 @@
+import { getCached, setCached } from '@/lib/cache';
 import { getAnimeDetailGQL } from '@/lib/anilist';
 import { resolveSlug } from '@/lib/slug-resolver';
 import { scrapeAnimeDetail } from '@/scraper/scraper';
@@ -28,10 +29,16 @@ export async function GET(
       // 2. Resolve the anikoto slug from the title (searches anikoto, cached)
       const anikotoSlug = await resolveSlug(slug, animeData.title);
 
-      // 3. If we found the anikoto slug, scrape the episode list
+      // 3. If we found the anikoto slug, scrape the episode list (cached in Redis)
       if (anikotoSlug) {
         try {
-          const scraped = await scrapeAnimeDetail(anikotoSlug);
+          const cachedScrape = await getCached<AnimeDetail>('scraper.detail', { slug: anikotoSlug }, 60 * 60 * 1000);
+          const scraped = cachedScrape.found
+            ? cachedScrape.data
+            : await scrapeAnimeDetail(anikotoSlug);
+          if (!cachedScrape.found) {
+            await setCached('scraper.detail', { slug: anikotoSlug }, scraped, 60 * 60 * 1000);
+          }
           if (scraped && scraped.episodes) {
             animeData.episodes = scraped.episodes;
             animeData.totalEpisodes = scraped.episodes.length;
