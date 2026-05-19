@@ -1,4 +1,4 @@
-import { getCached, setCached } from '@/lib/cache';
+import { getCachedSwr, setCached } from '@/lib/cache';
 import { getAnimeDetailGQL } from '@/lib/anilist';
 import { resolveSlug } from '@/lib/slug-resolver';
 import { scrapeAnimeDetail } from '@/scraper/scraper';
@@ -29,16 +29,33 @@ export async function GET(
       // 2. Resolve the anikoto slug from the title (searches anikoto, cached)
       const anikotoSlug = await resolveSlug(slug, animeData.title);
 
-      // 3. If we found the anikoto slug, scrape the episode list (cached in Redis)
+      // 3. If we found the anikoto slug, scrape the episode list with SWR
+      //    30min fresh, 1h stale window (1.5h total Redis TTL)
       if (anikotoSlug) {
         try {
-          const cachedScrape = await getCached<AnimeDetail>('scraper.detail', { slug: anikotoSlug }, 60 * 60 * 1000);
-          const scraped = cachedScrape.found
-            ? cachedScrape.data
-            : await scrapeAnimeDetail(anikotoSlug);
-          if (!cachedScrape.found) {
-            await setCached('scraper.detail', { slug: anikotoSlug }, scraped, 60 * 60 * 1000);
+          const swrResult = await getCachedSwr<AnimeDetail>(
+            'scraper.detail',
+            { slug: anikotoSlug },
+            30 * 60 * 1000,    // fresh TTL: 30 minutes
+            60 * 60 * 1000,    // stale TTL: 1 hour
+          );
+
+          let scraped = swrResult.found ? swrResult.data : null;
+
+          if (!swrResult.found) {
+            // Cache miss — scrape fresh
+            scraped = await scrapeAnimeDetail(anikotoSlug);
+            await setCached('scraper.detail', { slug: anikotoSlug }, scraped, 90 * 60 * 1000);
+          } else if (!swrResult.fresh) {
+            // Stale hit — fire-and-forget background refresh
+            scrapeAnimeDetail(anikotoSlug)
+              .then((freshData) => {
+                setCached('scraper.detail', { slug: anikotoSlug }, freshData, 90 * 60 * 1000)
+                  .catch(() => {});
+              })
+              .catch(() => {});
           }
+
           if (scraped && scraped.episodes) {
             animeData.episodes = scraped.episodes;
             animeData.totalEpisodes = scraped.episodes.length;
@@ -56,7 +73,6 @@ export async function GET(
           }
         } catch (e) {
           // Episode list scraping failed — return AniList data without episodes
-          // The watch page will still work by searching anikoto when navigating to an episode
         }
       }
 

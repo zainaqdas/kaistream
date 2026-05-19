@@ -1,4 +1,4 @@
-import { getCached, setCached } from '@/lib/cache';
+import { getCachedSwr, setCached } from '@/lib/cache';
 import { getAnimeDetailGQL } from '@/lib/anilist';
 import { getCachedSlug, resolveSlug } from '@/lib/slug-resolver';
 import { scrapeEpisodeSources } from '@/scraper/scraper';
@@ -44,15 +44,34 @@ export async function GET(
       );
     }
 
-    // Check Redis cache first, then scrape if not found
-    const cachedSources = await getCached<EpisodeSources>('scraper.sources', { slug: anikotoSlug, episode }, 6 * 60 * 60 * 1000);
-    const data = cachedSources.found
-      ? cachedSources.data
-      : await scrapeEpisodeSources(anikotoSlug, episode);
-    if (!cachedSources.found) {
+    // Use stale-while-revalidate: 1h fresh, 5h stale window (6h total Redis TTL)
+    // When stale, we return the cached data and trigger a background refresh
+    const swrResult = await getCachedSwr<EpisodeSources>(
+      'scraper.sources',
+      { slug: anikotoSlug, episode },
+      60 * 60 * 1000,     // fresh TTL: 1 hour
+      5 * 60 * 60 * 1000,  // stale TTL: 5 hours
+    );
+
+    let data = swrResult.found ? swrResult.data : null;
+    let didRefresh = false;
+
+    if (!swrResult.found) {
+      // Cache miss — scrape fresh
+      data = await scrapeEpisodeSources(anikotoSlug, episode);
       await setCached('scraper.sources', { slug: anikotoSlug, episode }, data, 6 * 60 * 60 * 1000);
+      didRefresh = true;
+    } else if (!swrResult.fresh) {
+      // Stale hit — return stale data but fire-and-forget a background refresh
+      scrapeEpisodeSources(anikotoSlug, episode)
+        .then((freshData) => {
+          setCached('scraper.sources', { slug: anikotoSlug, episode }, freshData, 6 * 60 * 60 * 1000)
+            .catch(() => {});
+        })
+        .catch(() => {});
     }
-    if (!data.title && data.servers.length === 0) {
+
+    if (!data || (!data.title && data.servers.length === 0)) {
       return Response.json(
         { success: false, error: 'Episode not found' } as { success: false; error: string },
         { status: 404 }
@@ -64,7 +83,9 @@ export async function GET(
       {
         headers: {
           'Content-Type': 'application/json',
-          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=86400',
+          'Cache-Control': didRefresh
+            ? 'public, s-maxage=300, stale-while-revalidate=86400'
+            : 'public, s-maxage=60, stale-while-revalidate=86400',
         },
       }
     );
