@@ -8,9 +8,17 @@
  * On Vercel, the cache persists across serverless function invocations,
  * so one user's fetch benefits all users.
  * In local dev, the cache is per-process (resets on server restart).
+ *
+ * Note: `@vercel/kv` is imported lazily (not at module level) to ensure
+ * the client is initialized at runtime when env vars are available.
  */
 
-import { kv as vercelKv } from '@vercel/kv';
+// Types for @vercel/kv (used only for the lazy import return type)
+type VercelKv = {
+  get: <T>(key: string) => Promise<T | null>;
+  set: (key: string, value: unknown, opts?: { ex?: number }) => Promise<string>;
+  del: (key: string) => Promise<number>;
+};
 
 // In-memory fallback store
 interface MemoryEntry {
@@ -19,8 +27,29 @@ interface MemoryEntry {
 }
 const memoryStore = new Map<string, MemoryEntry>();
 
-// Whether Vercel KV (Redis) is available
-const useRedis = !!(process.env.KV_URL || process.env.KV_REST_API_URL);
+let kvClient: VercelKv | null = null;
+
+/**
+ * Lazily get the @vercel/kv client.
+ * Only initialized when Redis is first used, which happens at runtime
+ * when env vars are available.
+ */
+async function getKvClient(): Promise<VercelKv> {
+  if (!kvClient) {
+    const { kv } = await import('@vercel/kv');
+    kvClient = kv as VercelKv;
+  }
+  return kvClient;
+}
+
+/**
+ * Check if Vercel KV (Redis) env vars are available.
+ * Called at runtime (not module init time) so build-time bundling
+ * doesn't bake in a stale value.
+ */
+export function isRedisAvailable(): boolean {
+  return !!(process.env.KV_URL || process.env.KV_REST_API_URL);
+}
 
 /**
  * Generate a namespaced cache key from a function name and its parameters.
@@ -57,8 +86,9 @@ export async function getCached<T>(
 ): Promise<CacheResult<T>> {
   const key = makeKey(namespace, vars);
 
-  if (useRedis) {
+  if (isRedisAvailable()) {
     try {
+      const vercelKv = await getKvClient();
       // Data is stored wrapped in an object { data: T } so we can distinguish
       // a cached null from "key not found" (Redis returns null for both)
       const raw = await vercelKv.get<{ data: T }>(key);
@@ -96,9 +126,10 @@ export async function setCached<T>(
 ): Promise<T> {
   const key = makeKey(namespace, vars);
 
-  if (useRedis) {
+  if (isRedisAvailable()) {
     try {
-      // Wrap data in an object so null values are distinguishable from "not found"
+      const vercelKv = await getKvClient();
+      // Wrap data in an object so null values are distinguishable from \"not found\"
       await vercelKv.set(key, { data }, { ex: Math.ceil(ttlMs / 1000) });
       return data;
     } catch {
@@ -120,8 +151,9 @@ export async function delCached(
 ): Promise<void> {
   const key = makeKey(namespace, vars);
 
-  if (useRedis) {
+  if (isRedisAvailable()) {
     try {
+      const vercelKv = await getKvClient();
       await vercelKv.del(key);
       return;
     } catch {
