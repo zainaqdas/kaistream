@@ -12,6 +12,10 @@
  * Supports stale-while-revalidate: each entry stores a `storedAt` timestamp
  * so callers can serve stale data while asynchronously refreshing it.
  *
+ * Cache stats are persisted in Redis so they accumulate across serverless
+ * invocations for accurate monitoring. In local dev (in-memory), stats
+ * are per-process and reset on restart.
+ *
  * Note: `@vercel/kv` is imported lazily (not at module level) to ensure
  * the client is initialized at runtime when env vars are available.
  */
@@ -24,6 +28,8 @@ type VercelKv = {
   keys: (pattern: string) => Promise<string[]>;
 };
 
+const STATS_KEY = 'kai:cache:stats';
+
 // In-memory fallback store
 interface MemoryEntry {
   data: unknown;
@@ -31,10 +37,16 @@ interface MemoryEntry {
 }
 const memoryStore = new Map<string, MemoryEntry>();
 
-// Cache stats for monitoring
-let cacheHits = 0;
-let cacheMisses = 0;
-let staleHits = 0;
+// In-memory counters for the current process invocation.
+// These get flushed to Redis periodically and merged on read.
+let invHits = 0;
+let invMisses = 0;
+let invStaleHits = 0;
+let opsSinceFlush = 0;
+
+// Flush interval: flush in-memory stats to Redis every N operations.
+// This balances accuracy with Redis I/O overhead.
+const FLUSH_INTERVAL = 20;
 
 let kvClient: VercelKv | null = null;
 
@@ -118,23 +130,98 @@ export interface CacheStats {
   memorySize: number;
 }
 
-export function getCacheStats(): CacheStats {
-  const total = cacheHits + cacheMisses + staleHits;
+// Persistent stats interface stored in Redis
+interface PersistentStats {
+  hits: number;
+  misses: number;
+  staleHits: number;
+}
+
+async function getPersistentStats(): Promise<PersistentStats> {
+  if (isRedisAvailable()) {
+    try {
+      const vercelKv = await getKvClient();
+      const stats = await vercelKv.get<PersistentStats>(STATS_KEY);
+      if (stats) return stats;
+    } catch {
+      // Redis error — fall through
+    }
+  }
+  return { hits: 0, misses: 0, staleHits: 0 };
+}
+
+async function flushStatsToRedis(): Promise<void> {
+  if (!isRedisAvailable()) return;
+  const batchHits = invHits;
+  const batchMisses = invMisses;
+  const batchStaleHits = invStaleHits;
+  if (batchHits === 0 && batchMisses === 0 && batchStaleHits === 0) return;
+
+  try {
+    const vercelKv = await getKvClient();
+    const current = await vercelKv.get<PersistentStats>(STATS_KEY);
+    const updated: PersistentStats = {
+      hits: (current?.hits || 0) + batchHits,
+      misses: (current?.misses || 0) + batchMisses,
+      staleHits: (current?.staleHits || 0) + batchStaleHits,
+    };
+    await vercelKv.set(STATS_KEY, updated);
+    // Reset in-memory counters after successful flush
+    invHits = 0;
+    invMisses = 0;
+    invStaleHits = 0;
+  } catch {
+    // Redis error — counters remain in-memory for next flush
+  }
+}
+
+async function incrementStat(field: 'hits' | 'misses' | 'staleHits'): Promise<void> {
+  if (field === 'hits') invHits++;
+  else if (field === 'misses') invMisses++;
+  else invStaleHits++;
+  opsSinceFlush++;
+
+  // Periodically flush to Redis to persist stats across invocations
+  if (opsSinceFlush >= FLUSH_INTERVAL && isRedisAvailable()) {
+    opsSinceFlush = 0;
+    flushStatsToRedis().catch(() => {});
+  }
+}
+
+export async function getCacheStats(): Promise<CacheStats> {
+  // Flush any remaining in-memory stats to Redis first for accuracy
+  if (opsSinceFlush > 0 && isRedisAvailable()) {
+    await flushStatsToRedis();
+  }
+
+  const persistent = await getPersistentStats();
+  const total = persistent.hits + persistent.misses + persistent.staleHits;
+
   return {
     backend: isRedisAvailable() ? 'redis' : 'memory',
-    hits: cacheHits,
-    misses: cacheMisses,
-    staleHits,
+    hits: persistent.hits,
+    misses: persistent.misses,
+    staleHits: persistent.staleHits,
     total,
-    hitRate: total > 0 ? Math.round(((cacheHits + staleHits) / total) * 100) : 0,
+    hitRate: total > 0 ? Math.round(((persistent.hits + persistent.staleHits) / total) * 100) : 0,
     memorySize: memoryStore.size,
   };
 }
 
-export function resetCacheStats(): void {
-  cacheHits = 0;
-  cacheMisses = 0;
-  staleHits = 0;
+export async function resetCacheStats(): Promise<void> {
+  invHits = 0;
+  invMisses = 0;
+  invStaleHits = 0;
+  opsSinceFlush = 0;
+
+  if (isRedisAvailable()) {
+    try {
+      const vercelKv = await getKvClient();
+      await vercelKv.set(STATS_KEY, { hits: 0, misses: 0, staleHits: 0 });
+    } catch {
+      // Redis error
+    }
+  }
 }
 
 // ===== Internal helpers =====
@@ -221,7 +308,7 @@ export async function getCached<T>(
   const entry = await getEntry<T>(key);
 
   if (!entry) {
-    cacheMisses++;
+    await incrementStat('misses');
     return { found: false };
   }
 
@@ -229,11 +316,11 @@ export async function getCached<T>(
   if (age > ttlMs) {
     // Entry expired — delete and return not found
     await deleteEntry(key);
-    cacheMisses++;
+    await incrementStat('misses');
     return { found: false };
   }
 
-  cacheHits++;
+  await incrementStat('hits');
   return { found: true, data: entry.data };
 }
 
@@ -262,7 +349,7 @@ export async function getCachedSwr<T>(
   const entry = await getEntry<T>(key);
 
   if (!entry) {
-    cacheMisses++;
+    await incrementStat('misses');
     return { found: false };
   }
 
@@ -272,18 +359,18 @@ export async function getCachedSwr<T>(
   if (age > totalTtlMs) {
     // Fully expired — delete and return not found
     await deleteEntry(key);
-    cacheMisses++;
+    await incrementStat('misses');
     return { found: false };
   }
 
   if (age <= freshTtlMs) {
     // Fresh
-    cacheHits++;
+    await incrementStat('hits');
     return { found: true, data: entry.data, fresh: true };
   }
 
   // Stale but within revalidate window
-  staleHits++;
+  await incrementStat('staleHits');
   return { found: true, data: entry.data, fresh: false };
 }
 
@@ -322,7 +409,6 @@ export async function delCached(
  * Delete all entries under a cache namespace.
  *
  * Example: `flushNamespace('scraper.sources')` clears all episode source caches.
- * Only works with Redis — in-memory store is cleared entirely.
  *
  * @param namespace - Cache namespace prefix (e.g. 'scraper.sources')
  */
