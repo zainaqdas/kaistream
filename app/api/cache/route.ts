@@ -6,14 +6,11 @@ export async function GET(request: Request): Promise<Response> {
   const { searchParams } = new URL(request.url);
   const reset = searchParams.get('reset') === 'true';
 
-  const stats = getCacheStats();
-
   if (reset) {
-    resetCacheStats();
-    stats.hits = 0;
-    stats.misses = 0;
-    stats.staleHits = 0;
+    await resetCacheStats();
   }
+
+  const stats = await getCacheStats();
 
   return new Response(
     JSON.stringify({

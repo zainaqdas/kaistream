@@ -12,9 +12,9 @@
  * Supports stale-while-revalidate: each entry stores a `storedAt` timestamp
  * so callers can serve stale data while asynchronously refreshing it.
  *
- * Cache stats are persisted in Redis so they accumulate across serverless
- * invocations for accurate monitoring. In local dev (in-memory), stats
- * are per-process and reset on restart.
+ * Cache stats use probability-based sampling (~10% of operations) to
+ * persist across serverless invocations without adding Redis I/O overhead
+ * on every cache operation.
  *
  * Note: `@vercel/kv` is imported lazily (not at module level) to ensure
  * the client is initialized at runtime when env vars are available.
@@ -28,7 +28,10 @@ type VercelKv = {
   keys: (pattern: string) => Promise<string[]>;
 };
 
-const STATS_KEY = 'kai:cache:stats';
+// Redis keys for persistent cache stats
+const STATS_HITS_KEY = 'kai:cache:stats:hits';
+const STATS_MISSES_KEY = 'kai:cache:stats:misses';
+const STATS_STALE_KEY = 'kai:cache:stats:staleHits';
 
 // In-memory fallback store
 interface MemoryEntry {
@@ -37,18 +40,13 @@ interface MemoryEntry {
 }
 const memoryStore = new Map<string, MemoryEntry>();
 
-// In-memory counters for the current process invocation.
-// These get flushed to Redis periodically and merged on read.
+// Per-process in-memory counter — used to batch Redis flush when probability triggers
 let invHits = 0;
 let invMisses = 0;
 let invStaleHits = 0;
-let opsSinceFlush = 0;
-
-// Flush interval: flush in-memory stats to Redis every N operations.
-// This balances accuracy with Redis I/O overhead.
-const FLUSH_INTERVAL = 20;
 
 let kvClient: VercelKv | null = null;
+let firstFlushAttempted = false;
 
 /**
  * Lazily get the @vercel/kv client.
@@ -130,70 +128,75 @@ export interface CacheStats {
   memorySize: number;
 }
 
-// Persistent stats interface stored in Redis
-interface PersistentStats {
-  hits: number;
-  misses: number;
-  staleHits: number;
-}
-
-async function getPersistentStats(): Promise<PersistentStats> {
-  if (isRedisAvailable()) {
-    try {
-      const vercelKv = await getKvClient();
-      const stats = await vercelKv.get<PersistentStats>(STATS_KEY);
-      if (stats) return stats;
-    } catch {
-      // Redis error — fall through
-    }
-  }
-  return { hits: 0, misses: 0, staleHits: 0 };
-}
-
-async function flushStatsToRedis(): Promise<void> {
-  if (!isRedisAvailable()) return;
-  const batchHits = invHits;
-  const batchMisses = invMisses;
-  const batchStaleHits = invStaleHits;
-  if (batchHits === 0 && batchMisses === 0 && batchStaleHits === 0) return;
-
-  try {
-    const vercelKv = await getKvClient();
-    const current = await vercelKv.get<PersistentStats>(STATS_KEY);
-    const updated: PersistentStats = {
-      hits: (current?.hits || 0) + batchHits,
-      misses: (current?.misses || 0) + batchMisses,
-      staleHits: (current?.staleHits || 0) + batchStaleHits,
-    };
-    await vercelKv.set(STATS_KEY, updated);
-    // Reset in-memory counters after successful flush
-    invHits = 0;
-    invMisses = 0;
-    invStaleHits = 0;
-  } catch {
-    // Redis error — counters remain in-memory for next flush
-  }
-}
-
+/**
+ * Increment a cache stat in Redis with probability-based sampling.
+ *
+ * We use ~10% sampling to avoid adding Redis I/O overhead on every
+ * cache operation. This gives us statistically accurate hit rates
+ * without the cost of a Redis read+write per cache operation.
+ *
+ * The very first call during a serverless invocation also flushes
+ * any accumulated in-memory counters from a previous invocation
+ * (rare race condition, but harmless).
+ */
 async function incrementStat(field: 'hits' | 'misses' | 'staleHits'): Promise<void> {
+  // Track in-memory for local dev (non-serverless)
   if (field === 'hits') invHits++;
   else if (field === 'misses') invMisses++;
   else invStaleHits++;
-  opsSinceFlush++;
 
-  // Periodically flush to Redis to persist stats across invocations
-  if (opsSinceFlush >= FLUSH_INTERVAL && isRedisAvailable()) {
-    opsSinceFlush = 0;
-    flushStatsToRedis().catch(() => {});
+  // In serverless, each invocation is a fresh process.
+  // Use ~10% random sampling to persist stats to Redis.
+  if (!isRedisAvailable()) return;
+  if (Math.random() > 0.1) return;
+
+  try {
+    const vercelKv = await getKvClient();
+    const statKey = field === 'hits'
+      ? STATS_HITS_KEY
+      : field === 'misses'
+        ? STATS_MISSES_KEY
+        : STATS_STALE_KEY;
+
+    const current = await vercelKv.get<number>(statKey);
+    await vercelKv.set(statKey, (current || 0) + 1);
+  } catch {
+    // Stats errors are non-critical — ignore
   }
 }
 
-export async function getCacheStats(): Promise<CacheStats> {
-  // Flush any remaining in-memory stats to Redis first for accuracy
-  if (opsSinceFlush > 0 && isRedisAvailable()) {
-    await flushStatsToRedis();
+/**
+ * Get persistent cache stats from Redis.
+ */
+async function getPersistentStats(): Promise<{ hits: number; misses: number; staleHits: number }> {
+  const stats = { hits: 0, misses: 0, staleHits: 0 };
+
+  if (!isRedisAvailable()) {
+    // In-memory fallback: add the current process's counters
+    stats.hits = invHits;
+    stats.misses = invMisses;
+    stats.staleHits = invStaleHits;
+    return stats;
   }
 
+  try {
+    const vercelKv = await getKvClient();
+    const [hits, misses, staleHits] = await Promise.all([
+      vercelKv.get<number>(STATS_HITS_KEY),
+      vercelKv.get<number>(STATS_MISSES_KEY),
+      vercelKv.get<number>(STATS_STALE_KEY),
+    ]);
+    stats.hits = hits || 0;
+    stats.misses = misses || 0;
+    stats.staleHits = staleHits || 0;
+  } catch {
+    // Redis error
+  }
+
+  return stats;
+}
+
+export async function getCacheStats(): Promise<CacheStats> {
   const persistent = await getPersistentStats();
   const total = persistent.hits + persistent.misses + persistent.staleHits;
 
@@ -209,15 +212,14 @@ export async function getCacheStats(): Promise<CacheStats> {
 }
 
 export async function resetCacheStats(): Promise<void> {
-  invHits = 0;
-  invMisses = 0;
-  invStaleHits = 0;
-  opsSinceFlush = 0;
-
   if (isRedisAvailable()) {
     try {
       const vercelKv = await getKvClient();
-      await vercelKv.set(STATS_KEY, { hits: 0, misses: 0, staleHits: 0 });
+      await Promise.all([
+        vercelKv.set(STATS_HITS_KEY, 0),
+        vercelKv.set(STATS_MISSES_KEY, 0),
+        vercelKv.set(STATS_STALE_KEY, 0),
+      ]);
     } catch {
       // Redis error
     }

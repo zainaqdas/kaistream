@@ -4,7 +4,7 @@ export const revalidate = 0;
 
 export async function GET(): Promise<Response> {
   const redisAvailable = isRedisAvailable();
-  const stats = getCacheStats();
+  const stats = await getCacheStats();
 
   return Response.json({
     status: 'ok',
