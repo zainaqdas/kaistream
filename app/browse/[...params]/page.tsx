@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { browse } from '@/lib/api';
 import AnimeCard from '@/components/AnimeCard';
+import type { BrowseResult } from '@/types';
 
-const categoryLabels = {
+const categoryLabels: Record<string, string> = {
   genre: 'Genre',
   type: 'Type',
   status: 'Status',
@@ -17,36 +18,41 @@ const categoryLabels = {
 
 export default function BrowsePage() {
   const params = useParams();
-  const pathParams = params.params || [];
+  const pathParams = (params.params as string[]) || [];
   const [category, value] = pathParams;
 
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
-  const [page, setPage] = useState(1);
+  const [data, setData] = useState<BrowseResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const pageRef = useRef(1);
+  const [hasMore, setHasMore] = useState(true);
 
   useEffect(() => {
     setData(null);
     setError(null);
-    setPage(1);
+    pageRef.current = 1;
+    setHasMore(true);
     browse(category, value || '', 1)
       .then((res) => {
-        if (res.success) setData(res.data);
-        else setError(res.error);
+        if (res.success && res.data) setData(res.data);
+        else setError(res.error ?? 'Unknown error');
       })
-      .catch((err) => setError(err.message));
+      .catch((err: Error) => setError(err.message));
   }, [category, value]);
 
   function loadMore() {
-    const nextPage = page + 1;
+    const nextPage = pageRef.current + 1;
     browse(category, value || '', nextPage)
       .then((res) => {
         if (res.success && res.data) {
           setData((prev) => ({
-            ...prev,
-            results: [...(prev?.results || []), ...(res.data.results || [])],
-            totalResults: res.data.totalResults,
+            ...prev!,
+            results: [...(prev?.results || []), ...(res.data!.results || [])],
+            totalResults: res.data!.totalResults,
           }));
-          setPage(nextPage);
+          pageRef.current = nextPage;
+          if (!res.data.results || res.data.results.length < 24) {
+            setHasMore(false);
+          }
         }
       })
       .catch(() => {});
@@ -94,11 +100,11 @@ export default function BrowsePage() {
         <>
           <div className="anime-grid">
             {data.results.map((item, i) => (
-              <AnimeCard key={item.slug || i} item={item} />
+              <AnimeCard key={item.slug || String(i)} item={item} />
             ))}
           </div>
 
-          {data.results.length >= 24 && (
+          {hasMore && (
             <div style={{ textAlign: 'center', marginTop: 32 }}>
               <button className="btn btn-primary" onClick={loadMore}>
                 Load More

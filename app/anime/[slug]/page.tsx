@@ -4,12 +4,13 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { getAnimeDetail } from '@/lib/api';
 import EpisodeGrid from '@/components/EpisodeGrid';
+import type { AnimeDetail } from '@/types';
 
 export default function AnimeDetailPage() {
   const params = useParams();
-  const slug = params.slug;
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
+  const slug = params.slug as string;
+  const [data, setData] = useState<AnimeDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
@@ -17,10 +18,10 @@ export default function AnimeDetailPage() {
     setError(null);
     getAnimeDetail(slug)
       .then((res) => {
-        if (res.success) setData(res.data);
-        else setError(res.error);
+        if (res.success && res.data) setData(res.data);
+        else setError(res.error ?? 'Unknown error');
       })
-      .catch((err) => setError(err.message));
+      .catch((err: Error) => setError(err.message));
   }, [slug]);
 
   if (error) {
@@ -56,7 +57,7 @@ export default function AnimeDetailPage() {
           <div className="anime-detail-content">
             <div className="anime-detail-poster">
               {bgImage ? (
-                <img src={bgImage} alt={data.title} />
+                <img src={bgImage} alt={data.title} fetchPriority="high" />
               ) : (
                 <div
                   style={{

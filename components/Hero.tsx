@@ -2,8 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import type { FeaturedAnime } from '@/types';
 
-export default function Hero({ items = [] }) {
+interface HeroProps {
+  items: FeaturedAnime[];
+}
+
+export default function Hero({ items = [] }: HeroProps) {
   const [current, setCurrent] = useState(0);
   const len = items.length;
 

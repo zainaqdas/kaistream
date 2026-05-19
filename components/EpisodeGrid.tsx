@@ -1,6 +1,13 @@
 import Link from 'next/link';
+import type { Episode } from '@/types';
 
-export default function EpisodeGrid({ episodes = [], animeSlug, currentEpisode }) {
+interface EpisodeGridProps {
+  episodes: Episode[];
+  animeSlug: string;
+  currentEpisode?: string | number;
+}
+
+export default function EpisodeGrid({ episodes = [], animeSlug, currentEpisode }: EpisodeGridProps) {
   if (!episodes.length) {
     return <div className="empty-state">No episodes available yet.</div>;
   }
@@ -19,10 +26,6 @@ export default function EpisodeGrid({ episodes = [], animeSlug, currentEpisode }
           >
             <span className="ep-num">{epNum}</span>
             {ep.title && <span>{ep.title}</span>}
-            <div className="ep-badges">
-              {ep.hasSub && <span className="ep-badge sub">SUB</span>}
-              {ep.hasDub && <span className="ep-badge dub">DUB</span>}
-            </div>
           </Link>
         );
       })}

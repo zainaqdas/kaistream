@@ -1,13 +1,14 @@
 import * as cheerio from 'cheerio';
-import { fetchHTML, fetchJSON, fetchExternalJSON, BASE_URL } from './client.js';
+import { fetchHTML, fetchJSON, fetchExternalJSON, BASE_URL } from './client';
+import type { FeaturedAnime, AnimeCardItem, AnimeDetail, Episode, EpisodeSources, ServerItem, DownloadLink, BrowseResult, HomeData, SearchData } from '@/types';
 
-function extractEpisodeMeta($item) {
+function extractEpisodeMeta($item: cheerio.Cheerio<any>): Partial<AnimeCardItem> {
   const link = $item.find('a').first();
   const href = link.attr('href') || '';
   const poster = $item.find('.ani.poster');
   const img = poster.find('img').attr('src') || '';
   const metaDiv = poster.find('.meta .inner');
-  
+
   const subEp = metaDiv.find('.ep-status.sub span').text().trim() || null;
   const dubEp = metaDiv.find('.ep-status.dub span').text().trim() || null;
   const totalEp = metaDiv.find('.ep-status.total span').text().trim() || null;
@@ -15,12 +16,12 @@ function extractEpisodeMeta($item) {
 
   const nameEl = $item.find('.info .name, .info a.name');
   const title = nameEl.text().trim();
-  const jpTitle = nameEl.data('jp') || null;
+  const jpTitle = nameEl.data('jp') as string | undefined || null;
 
   return {
     title,
     japaneseTitle: jpTitle,
-    slug: extractSlug(href),
+    slug: extractSlug(href) || undefined,
     episodeUrl: href.startsWith('http') ? href : `${BASE_URL}${href}`,
     thumbnail: img,
     episodes: {
@@ -28,30 +29,41 @@ function extractEpisodeMeta($item) {
       dub: dubEp ? parseInt(dubEp) : null,
       total: totalEp ? parseInt(totalEp) : null,
     },
-    type,
+    type: type || undefined,
   };
 }
 
-function extractSlug(url) {
+function extractSlug(url: string): string | null {
   const match = url.match(/\/watch\/([^/]+)/);
   return match ? match[1] : null;
+}
+
+interface EpisodeLinkData {
+  slug?: string;
+  num?: string;
+  mal?: string;
+  timestamp?: string;
+  ids?: string;
+  sub?: string;
+  dub?: string;
+  title?: string;
 }
 
 /**
  * Parse episode link data attributes from an <a> element
  */
-function parseEpisodeLink($el, slug) {
-  const epSlug = $el.data('slug');
-  const epNum = $el.data('num');
-  const malId = $el.data('mal');
-  const timestamp = $el.data('timestamp');
-  const ids = $el.data('ids');
-  const sub = $el.data('sub');
-  const dub = $el.data('dub');
-  const epTitleAttr = $el.data('title');
-  
+function parseEpisodeLink($el: cheerio.Cheerio<any>, slug: string): Episode | null {
+  const epSlug = $el.attr('data-slug');
+  const epNum = $el.attr('data-num');
+  const malId = $el.attr('data-mal');
+  const timestamp = $el.attr('data-timestamp');
+  const ids = $el.attr('data-ids');
+  const sub = $el.attr('data-sub');
+  const dub = $el.attr('data-dub');
+  const epTitleAttr = $el.attr('data-title');
+
   if (!epSlug) return null;
-  
+
   return {
     episode: epNum ? parseInt(epNum) : null,
     slug: epSlug,
@@ -68,21 +80,21 @@ function parseEpisodeLink($el, slug) {
 /**
  * Scrape the homepage
  */
-export async function scrapeHome() {
+export async function scrapeHome(): Promise<HomeData> {
   const html = await fetchHTML('/home');
   const $ = cheerio.load(html);
-  const result = { featured: [], latestEpisodes: [], trending: [] };
+  const result: HomeData = { featured: [], latestEpisodes: [], trending: [] };
 
   // Featured/trending anime from the carousel
-  $('#hotest .swiper-slide.item').each((i, el) => {
+  $('#hotest .swiper-slide.item').each((_i, el) => {
     const $el = $(el);
     const titleEl = $el.find('.title.d-title');
     const title = titleEl.text().trim();
-    const jpTitle = titleEl.data('jp') || null;
+    const jpTitle = titleEl.data('jp') as string | undefined || null;
     const synopsis = $el.find('.synopsis').text().trim();
     const playLink = $el.find('.actions a.btn.play').attr('href') || '';
     const img = $el.find('.image div').css('background-image') || '';
-    const bgUrl = img.replace(/^url\(['"]?|['"]?\)$/g, '');
+    const bgUrl = img.replace(/^url\(['\"]?|['\"]?\)$/g, '');
 
     const metaEl = $el.find('.meta.icons');
     const rating = metaEl.find('.rating').text().trim();
@@ -94,7 +106,7 @@ export async function scrapeHome() {
     result.featured.push({
       title,
       japaneseTitle: jpTitle,
-      slug: extractSlug(playLink),
+      slug: extractSlug(playLink) || '',
       url: playLink.startsWith('http') ? playLink : `${BASE_URL}${playLink}`,
       synopsis,
       thumbnail: bgUrl || null,
@@ -107,30 +119,30 @@ export async function scrapeHome() {
   });
 
   // Latest episodes section
-  $('#recent-update .ani.items .item').each((i, el) => {
+  $('#recent-update .ani.items .item').each((_i, el) => {
     const $el = $(el);
     const item = extractEpisodeMeta($el);
-    result.latestEpisodes.push(item);
+    result.latestEpisodes.push(item as AnimeCardItem);
   });
 
   // Trending sidebar
-  $('.scaff.side.items.md .item').each((i, el) => {
+  $('.scaff.side.items.md .item').each((_i, el) => {
     const $el = $(el);
     const link = $el.attr('href') || '';
     const img = $el.find('.poster img').attr('src') || '';
     const nameEl = $el.find('.info .name.d-title');
     const title = nameEl.text().trim();
-    const jpTitle = nameEl.data('jp') || null;
+    const jpTitle = nameEl.data('jp') as string | undefined || null;
     const score = $el.find('.info .meta .score').text().trim();
 
     result.trending.push({
       title,
       japaneseTitle: jpTitle,
-      slug: extractSlug(link),
+      slug: extractSlug(link) || '',
       url: link.startsWith('http') ? link : `${BASE_URL}${link}`,
       thumbnail: img,
       score: score || null,
-    });
+    } as AnimeCardItem);
   });
 
   return result;
@@ -139,19 +151,19 @@ export async function scrapeHome() {
 /**
  * Search anime by keyword
  */
-export async function searchAnime(keyword, page = 1) {
+export async function searchAnime(keyword: string, page: number = 1): Promise<SearchData> {
   const html = await fetchHTML('/filter', { keyword, page });
   const $ = cheerio.load(html);
-  const results = [];
+  const results: AnimeCardItem[] = [];
 
   // Main search results
-  $('.ani.items .item, .listing .item').each((i, el) => {
-    results.push(extractEpisodeMeta($(el)));
+  $('.ani.items .item, .listing .item').each((_i, el) => {
+    results.push(extractEpisodeMeta($(el)) as AnimeCardItem);
   });
 
   // Fallback: look for items in common containers
   if (results.length === 0) {
-    $('.container .item, .content .item, main .item').each((i, el) => {
+    $('.container .item, .content .item, main .item').each((_i, el) => {
       const $el = $(el);
       const link = $el.find('a').first().attr('href') || '';
       const title = $el.find('.name, .title, h2, h3').first().text().trim();
@@ -159,7 +171,7 @@ export async function searchAnime(keyword, page = 1) {
       if (title) {
         results.push({
           title,
-          slug: extractSlug(link),
+          slug: extractSlug(link) || '',
           episodeUrl: link.startsWith('http') ? link : `${BASE_URL}${link}`,
           thumbnail: img,
         });
@@ -178,27 +190,26 @@ export async function searchAnime(keyword, page = 1) {
 /**
  * Get anime detail and episode list
  */
-export async function scrapeAnimeDetail(slug) {
+export async function scrapeAnimeDetail(slug: string): Promise<AnimeDetail> {
   const html = await fetchHTML(`/watch/${slug}`);
   const $ = cheerio.load(html);
 
   const watchMain = $('#watch-main');
-  const animeId = watchMain.data('id');
-  const animeUrl = watchMain.data('url');
+  const animeId = watchMain.data('id') as string | undefined;
 
   // Info section
   const infoSection = $('#w-info');
   const titleEl = infoSection.find('h1.title');
   const title = titleEl.text().trim();
-  const jpTitle = titleEl.data('jp') || null;
+  const jpTitle = titleEl.data('jp') as string | undefined || null;
   const poster = infoSection.find('.binfo .poster img').attr('src') || '';
   const synopsis = infoSection.find('.synopsis .content').text().trim();
   const altNames = infoSection.find('.names').text().trim() || null;
 
   // Meta info
-  const meta = {};
-  infoSection.find('.bmeta .meta').each((i, section) => {
-    $(section).find('div').each((j, div) => {
+  const meta: Record<string, string> = {};
+  infoSection.find('.bmeta .meta').each((_i, section) => {
+    $(section).find('div').each((_j, div) => {
       const $div = $(div);
       const label = $div.clone().children().remove().end().text().trim().replace(':', '');
       const value = $div.find('span').text().trim();
@@ -207,18 +218,18 @@ export async function scrapeAnimeDetail(slug) {
   });
 
   // Genres
-  const genres = [];
-  infoSection.find('.bmeta .meta a[href*="/genre/"]').each((i, el) => {
+  const genres: string[] = [];
+  infoSection.find('.bmeta .meta a[href*="/genre/"]').each((_i, el) => {
     genres.push($(el).text().trim());
   });
 
   // Rating
-  const ratingScore = $('#w-rating').data('score') || null;
+  const ratingScore = $('#w-rating').data('score') as string | undefined || null;
 
   // Icons (sub/dub/quality)
-  const icons = {};
+  const icons: { sub?: boolean; dub?: boolean; rating?: string; quality?: string } = {};
   const iconsEl = infoSection.find('.meta.icons');
-  iconsEl.find('i').each((i, el) => {
+  iconsEl.find('i').each((_i, el) => {
     const $el = $(el);
     if ($el.hasClass('sub')) icons.sub = true;
     if ($el.hasClass('dub')) icons.dub = true;
@@ -227,14 +238,13 @@ export async function scrapeAnimeDetail(slug) {
   });
 
   // Load episodes via the AJAX endpoint (path-segment format)
-  let episodes = [];
+  let episodes: Episode[] = [];
   if (animeId) {
     try {
-      const epData = await fetchJSON(`ajax/episode/list/${animeId}`);
+      const epData = await fetchJSON<{ status: number; result?: string }>(`ajax/episode/list/${animeId}`);
       if (epData && epData.status === 200 && epData.result) {
         const $ep = cheerio.load(epData.result);
-        // Parse all episode ranges (including hidden ones)
-        $ep('ul.ep-range li a[data-slug]').each((i, el) => {
+        $ep('ul.ep-range li a[data-slug]').each((_i, el) => {
           const parsed = parseEpisodeLink($ep(el), slug);
           if (parsed) episodes.push(parsed);
         });
@@ -252,7 +262,7 @@ export async function scrapeAnimeDetail(slug) {
     title,
     japaneseTitle: jpTitle,
     slug,
-    url: animeUrl || `${BASE_URL}/watch/${slug}`,
+    url: `${BASE_URL}/watch/${slug}`,
     poster,
     synopsis: synopsis || null,
     alternativeNames: altNames,
@@ -267,38 +277,30 @@ export async function scrapeAnimeDetail(slug) {
 
 /**
  * Get streaming sources for an episode
- * 
- * Flow:
- * 1. Get episode page HTML to find animeId
- * 2. Fetch episode list via /ajax/episode/list/{animeId} to find the target episode
- * 3. Extract `data-ids` from the episode link (the server list key)
- * 4. Call /ajax/server/list?servers={data-ids} to get ALL available server entries
- * 5. Resolve each server's data-link-id via /ajax/server?get={linkId} for embed URLs
- * 6. ALSO try the mapper API as an additional source for Kiwi-Stream servers
  */
-export async function scrapeEpisodeSources(slug, episodeNum) {
+export async function scrapeEpisodeSources(slug: string, episodeNum: string | number): Promise<EpisodeSources> {
   const html = await fetchHTML(`/watch/${slug}/ep-${episodeNum}`);
   const $ = cheerio.load(html);
 
   const watchMain = $('#watch-main');
-  const animeId = watchMain.data('id');
+  const animeId = watchMain.data('id') as string | undefined;
 
   // Title info
   const title = $('#w-info h1.title').text().trim();
   const poster = $('#w-info .binfo .poster img').attr('src') || '';
 
-  const servers = [];
-  const downloadLinks = [];
-  const foundLinkIds = new Set();
-  let malId = null;
+  const servers: ServerItem[] = [];
+  const downloadLinks: DownloadLink[] = [];
+  const foundLinkIds = new Set<string>();
+  let malId: string | null = null;
   let epSlug = String(episodeNum);
-  let timestamp = null;
-  let dataIds = null;
+  let timestamp: string | null = null;
+  let dataIds: string | null = null;
 
   // Step 1 & 2: Fetch episode list to find the target episode link
   if (animeId) {
     try {
-      const epData = await fetchJSON(`ajax/episode/list/${animeId}`);
+      const epData = await fetchJSON<{ status: number; result?: string }>(`ajax/episode/list/${animeId}`);
       if (epData && epData.status === 200 && epData.result) {
         const $ep = cheerio.load(epData.result);
         // Find the episode link matching our episode number
@@ -307,10 +309,10 @@ export async function scrapeEpisodeSources(slug, episodeNum) {
           targetEp = $ep(`ul.ep-range li a[data-slug="${episodeNum}"]`).first();
         }
         if (targetEp.length) {
-          malId = targetEp.data('mal') || null;
-          epSlug = targetEp.data('slug') || String(episodeNum);
-          timestamp = targetEp.data('timestamp') || null;
-          dataIds = targetEp.data('ids') ? String(targetEp.data('ids')) : null;
+          malId = targetEp.attr('data-mal') || null;
+          epSlug = targetEp.attr('data-slug') || String(episodeNum);
+          timestamp = targetEp.attr('data-timestamp') || null;
+          dataIds = targetEp.attr('data-ids') ? String(targetEp.attr('data-ids')) : null;
         }
       }
     } catch (e) {
@@ -321,21 +323,21 @@ export async function scrapeEpisodeSources(slug, episodeNum) {
   // Step 3 & 4: Get the full server list via ajax/server/list with data-ids
   if (dataIds) {
     try {
-      const serverListData = await fetchJSON('ajax/server/list', { servers: dataIds });
+      const serverListData = await fetchJSON<{ status: number; result?: string }>('ajax/server/list', { servers: dataIds });
       if (serverListData && serverListData.status === 200 && serverListData.result) {
         const $srv = cheerio.load(serverListData.result);
-        const serverEntries = [];
-        $srv('.type').each((i, typeEl) => {
+        const serverEntries: { name: string; type: string; linkId: string }[] = [];
+        $srv('.type').each((_i, typeEl) => {
           const $type = $srv(typeEl);
           const type = $type.data('type') || 'sub';
-          $type.find('li[data-link-id]').each((j, li) => {
+          $type.find('li[data-link-id]').each((_j, li) => {
             const $li = $srv(li);
-            const linkId = $li.data('link-id');
+            const linkId = $li.data('link-id') as string | undefined;
             if (linkId && !foundLinkIds.has(linkId)) {
               foundLinkIds.add(linkId);
               serverEntries.push({
                 name: $li.text().trim() || 'Unknown',
-                type,
+                type: String(type),
                 linkId,
               });
             }
@@ -347,7 +349,7 @@ export async function scrapeEpisodeSources(slug, episodeNum) {
           const results = await Promise.allSettled(
             serverEntries.map(async (entry) => {
               try {
-                const sd = await fetchJSON('ajax/server', { get: entry.linkId });
+                const sd = await fetchJSON<{ status: number; result?: { url: string; skip_data?: Record<string, number[]> } }>('ajax/server', { get: entry.linkId });
                 if (sd?.status === 200 && sd?.result?.url) {
                   return {
                     name: entry.name,
@@ -355,9 +357,9 @@ export async function scrapeEpisodeSources(slug, episodeNum) {
                     embedUrl: sd.result.url,
                     linkId: entry.linkId,
                     skipData: sd.result.skip_data || null,
-                  };
+                  } as ServerItem;
                 }
-              } catch (e) {}
+              } catch (e) { /* ignore */ }
               return null;
             })
           );
@@ -377,54 +379,49 @@ export async function scrapeEpisodeSources(slug, episodeNum) {
   if (malId && epSlug && timestamp) {
     try {
       const mapperUrl = `https://mapper.mewcdn.online/api/mal/${malId}/${epSlug}/${timestamp}`;
-      const mapperRes = await fetchExternalJSON(mapperUrl);
-      
+      const mapperRes = await fetchExternalJSON<Record<string, unknown>>(mapperUrl);
+
       if (mapperRes && typeof mapperRes === 'object') {
-        const linkIdsToResolve = [];
-        
+        const linkIdsToResolve: { name: string; type: string; linkId: string }[] = [];
+
         for (const [key, data] of Object.entries(mapperRes)) {
           if (key === 'status') continue;
           if (typeof data !== 'object' || data === null) continue;
 
+          const entry = data as Record<string, { url?: string; download?: Record<string, string> }>;
           const serverName = key
             .replace(/-/g, ' ')
             .replace(/\b\w/g, c => c.toUpperCase());
-          
+
           // Sub sources
-          if (data.sub && data.sub.url) {
-            const linkId = data.sub.url;
+          if (entry.sub?.url) {
+            const linkId = entry.sub.url;
             if (!foundLinkIds.has(linkId)) {
               foundLinkIds.add(linkId);
               linkIdsToResolve.push({ name: serverName, type: 'sub', linkId });
             }
           }
-          
+
           // Sub downloads
-          if (data.sub && data.sub.download) {
-            const dlData = data.sub.download;
-            if (typeof dlData === 'object') {
-              for (const [dlName, dlUrl] of Object.entries(dlData)) {
-                downloadLinks.push({ name: dlName || serverName, url: dlUrl, type: 'sub' });
-              }
+          if (entry.sub?.download) {
+            for (const [dlName, dlUrl] of Object.entries(entry.sub.download)) {
+              downloadLinks.push({ name: dlName || serverName, url: dlUrl, type: 'sub' });
             }
           }
-          
+
           // Dub sources
-          if (data.dub && data.dub.url) {
-            const linkId = data.dub.url;
+          if (entry.dub?.url) {
+            const linkId = entry.dub.url;
             if (!foundLinkIds.has(linkId)) {
               foundLinkIds.add(linkId);
               linkIdsToResolve.push({ name: serverName, type: 'dub', linkId });
             }
           }
-          
+
           // Dub downloads
-          if (data.dub && data.dub.download) {
-            const dlData = data.dub.download;
-            if (typeof dlData === 'object') {
-              for (const [dlName, dlUrl] of Object.entries(dlData)) {
-                downloadLinks.push({ name: dlName || serverName, url: dlUrl, type: 'dub' });
-              }
+          if (entry.dub?.download) {
+            for (const [dlName, dlUrl] of Object.entries(entry.dub.download)) {
+              downloadLinks.push({ name: dlName || serverName, url: dlUrl, type: 'dub' });
             }
           }
         }
@@ -434,7 +431,7 @@ export async function scrapeEpisodeSources(slug, episodeNum) {
           const results = await Promise.allSettled(
             linkIdsToResolve.map(async (entry) => {
               try {
-                const serverData = await fetchJSON('ajax/server', { get: entry.linkId });
+                const serverData = await fetchJSON<{ status: number; result?: { url: string; skip_data?: Record<string, number[]> } }>('ajax/server', { get: entry.linkId });
                 if (serverData && serverData.status === 200 && serverData.result) {
                   return {
                     name: entry.name,
@@ -442,9 +439,9 @@ export async function scrapeEpisodeSources(slug, episodeNum) {
                     embedUrl: serverData.result.url,
                     linkId: entry.linkId,
                     skipData: serverData.result.skip_data || null,
-                  };
+                  } as ServerItem;
                 }
-              } catch (e) {}
+              } catch (e) { /* ignore */ }
               return null;
             })
           );
@@ -465,7 +462,7 @@ export async function scrapeEpisodeSources(slug, episodeNum) {
     title,
     slug,
     poster: poster || null,
-    episode: parseInt(episodeNum),
+    episode: parseInt(String(episodeNum)),
     episodeSlug: epSlug,
     url: `${BASE_URL}/watch/${slug}/ep-${episodeNum}`,
     servers,
@@ -477,8 +474,8 @@ export async function scrapeEpisodeSources(slug, episodeNum) {
 /**
  * Browse anime by genre, type, status, or listing page
  */
-export async function browseAnime(category, value, page = 1) {
-  let path;
+export async function browseAnime(category: string, value: string, page: number = 1): Promise<BrowseResult> {
+  let path: string;
   switch (category) {
     case 'genre':
       path = `/genre/${value}`;
@@ -504,14 +501,14 @@ export async function browseAnime(category, value, page = 1) {
 
   const html = await fetchHTML(path, page > 1 ? { page } : {});
   const $ = cheerio.load(html);
-  const results = [];
+  const results: AnimeCardItem[] = [];
 
-  $('.ani.items .item, .items .item, .listing .item').each((i, el) => {
-    results.push(extractEpisodeMeta($(el)));
+  $('.ani.items .item, .items .item, .listing .item').each((_i, el) => {
+    results.push(extractEpisodeMeta($(el)) as AnimeCardItem);
   });
 
   const pageTitle = $('title').text().trim();
-  
+
   return {
     category,
     value,

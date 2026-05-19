@@ -1,8 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import type { ServerItem } from '@/types';
 
-export default function Player({ servers = [], title, episode }) {
+interface PlayerProps {
+  servers: ServerItem[];
+  title: string;
+  episode: string | number;
+}
+
+export default function Player({ servers = [], title, episode }: PlayerProps) {
   const [currentServer, setCurrentServer] = useState(0);
   const [serverGroup, setServerGroup] = useState('sub');
 
@@ -10,8 +17,8 @@ export default function Player({ servers = [], title, episode }) {
 
   // Group servers by sub/dub
   const grouped = useMemo(() => {
-    const sub = [];
-    const dub = [];
+    const sub: ServerItem[] = [];
+    const dub: ServerItem[] = [];
     serversList.forEach((s) => {
       if (s.type === 'dub') dub.push(s);
       else sub.push(s);
@@ -19,12 +26,12 @@ export default function Player({ servers = [], title, episode }) {
     return { sub, dub };
   }, [serversList]);
 
-  const activeGroup = grouped[serverGroup] || [];
+  const activeGroup = grouped[serverGroup as keyof typeof grouped] || [];
   const hasSub = grouped.sub.length > 0;
   const hasDub = grouped.dub.length > 0;
 
   // Reset currentServer if switching groups
-  const handleGroupChange = (group) => {
+  const handleGroupChange = (group: string) => {
     setServerGroup(group);
     setCurrentServer(0);
   };

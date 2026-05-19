@@ -32,6 +32,8 @@
 
 html {
   scroll-behavior: smooth;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 body {
@@ -41,6 +43,9 @@ body {
   min-height: 100vh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
 }
 
 a {
@@ -71,6 +76,7 @@ input {
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 20px;
+  width: 100%;
 }
 
 /* ===== Scrollbar ===== */
@@ -88,9 +94,9 @@ input {
   background: var(--border-light);
 }
 
-/* ===== Mobile Menu Button ===== */
-.mobile-menu-btn {
-  display: none;
+/* ===== Menu Button (Hamburger) ===== */
+.menu-btn {
+  display: flex;
   flex-direction: column;
   gap: 5px;
   padding: 8px;
@@ -98,9 +104,11 @@ input {
   border: none;
   cursor: pointer;
   z-index: 110;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-menu-btn span {
+.menu-btn span {
   display: block;
   width: 22px;
   height: 2px;
@@ -109,13 +117,13 @@ input {
   transition: var(--transition);
 }
 
-.mobile-menu-btn.is-active span:nth-child(1) {
+.menu-btn.is-active span:nth-child(1) {
   transform: rotate(45deg) translate(5px, 5px);
 }
-.mobile-menu-btn.is-active span:nth-child(2) {
+.menu-btn.is-active span:nth-child(2) {
   opacity: 0;
 }
-.mobile-menu-btn.is-active span:nth-child(3) {
+.menu-btn.is-active span:nth-child(3) {
   transform: rotate(-45deg) translate(5px, -5px);
 }
 
@@ -133,7 +141,7 @@ input {
 .header-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   height: 64px;
   gap: 16px;
 }
@@ -160,6 +168,7 @@ input {
   flex: 1;
   max-width: 480px;
   position: relative;
+  margin-left: auto;
 }
 
 .header-search input {
@@ -206,177 +215,6 @@ input {
   border-radius: 4px;
   padding: 2px 6px;
   pointer-events: none;
-}
-
-.header-nav {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.nav-link {
-  padding: 8px 12px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  border-radius: var(--radius-sm);
-  transition: var(--transition);
-  white-space: nowrap;
-}
-
-.nav-link:hover,
-.nav-link.is-active {
-  color: var(--text-primary);
-  background: var(--bg-card);
-}
-
-.trending-link {
-  color: #ff9800;
-}
-
-.trending-link:hover {
-  color: #ffb74d;
-}
-
-.trending-icon {
-  font-size: 12px;
-}
-
-/* ===== Dropdown Menu ===== */
-.nav-dropdown {
-  position: relative;
-}
-
-.dropdown-toggle {
-  cursor: pointer;
-  background: none;
-  border: none;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 8px 12px;
-  color: var(--text-secondary);
-  border-radius: var(--radius-sm);
-  transition: var(--transition);
-  white-space: nowrap;
-}
-
-.dropdown-toggle:hover,
-.dropdown-toggle.is-active {
-  color: var(--text-primary);
-  background: var(--bg-card);
-}
-
-.dropdown-menu {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  min-width: 240px;
-  max-width: 320px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
-  z-index: 200;
-  padding: 8px 0;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.nav-dropdown.is-open .dropdown-menu {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(0);
-}
-
-.dropdown-header {
-  padding: 8px 16px 6px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--text-muted);
-}
-
-.dropdown-section {
-  border-bottom: 1px solid var(--border);
-}
-
-.dropdown-section:last-of-type {
-  border-bottom: none;
-}
-
-.dropdown-subtoggle {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  transition: var(--transition);
-  font-family: inherit;
-  gap: 8px;
-}
-
-.dropdown-subtoggle:hover,
-.dropdown-subtoggle.is-active {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-}
-
-.dropdown-subtoggle .arrow {
-  margin-left: auto;
-  font-size: 10px;
-  color: var(--text-muted);
-}
-
-.d-icon {
-  font-size: 14px;
-}
-
-.dropdown-submenu {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 4px 8px 8px;
-  gap: 2px;
-}
-
-.dropdown-item {
-  display: block;
-  padding: 6px 10px;
-  font-size: 13px;
-  color: var(--text-secondary);
-  border-radius: 4px;
-  transition: var(--transition);
-}
-
-.dropdown-item:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
-}
-
-.dropdown-item.highlight {
-  padding: 10px 16px;
-  font-weight: 500;
-  border-radius: 0;
-}
-
-.dropdown-item.highlight:hover {
-  background: var(--bg-hover);
-}
-
-.dropdown-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 4px 0;
 }
 
 /* ===== Browse Page ===== */
@@ -471,8 +309,6 @@ input {
 
 .anime-card-badge {
   position: absolute;
-  top: 8px;
-  left: 8px;
   font-size: 11px;
   font-weight: 700;
   padding: 3px 8px;
@@ -482,19 +318,27 @@ input {
 }
 
 .anime-card-badge.sub {
+  top: 8px;
+  left: 8px;
   background: rgba(79, 195, 247, 0.85);
 }
 
 .anime-card-badge.dub {
+  top: 8px;
+  left: 8px;
   background: rgba(255, 138, 101, 0.85);
 }
 
 .anime-card-badge.episode {
+  top: 8px;
+  left: 8px;
   background: rgba(0, 0, 0, 0.75);
 }
 
 .anime-card-badge.rating {
-  background: rgba(255, 193, 7, 0.85);
+  bottom: 8px;
+  right: 8px;
+  background: rgba(255, 193, 7, 0.9);
   color: #1a1a2e;
 }
 
@@ -580,7 +424,10 @@ input {
   height: 100%;
   display: flex;
   align-items: center;
-  padding: 0 20px;
+}
+
+.hero-content .container {
+  width: 100%;
 }
 
 .hero-inner {
@@ -717,6 +564,175 @@ input {
   background: var(--accent);
   width: 24px;
   border-radius: 4px;
+}
+
+/* ===== Sidebar (Drawer Overlay) ===== */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 199;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 200;
+  width: 280px;
+  height: 100dvh;
+  height: 100vh;
+  padding-top: 64px;
+  overflow-y: auto;
+  background: var(--bg-secondary);
+  border-right: 1px solid var(--border);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  box-shadow: none;
+  will-change: transform;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sidebar.sidebar--open {
+  transform: translateX(0);
+  box-shadow: var(--shadow-lg);
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-inner {
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px;
+}
+
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+}
+
+.sidebar-link:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.sidebar-link.is-active {
+  color: var(--text-primary);
+  background: rgba(16, 185, 129, 0.1);
+  border-left: 2px solid var(--accent);
+}
+
+.sidebar-link--trending {
+  color: #ff9800;
+}
+
+.sidebar-link--trending:hover {
+  color: #ffb74d;
+}
+
+.sidebar-link-icon {
+  font-size: 14px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 8px 12px;
+}
+
+.sidebar-section {
+  padding: 0 8px;
+}
+
+.sidebar-section-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  transition: var(--transition);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sidebar-section-toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.sidebar-arrow {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.sidebar-submenu {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 2px 8px 8px;
+  gap: 2px;
+}
+
+.sidebar-sub-link {
+  display: block;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  border-radius: 4px;
+  transition: var(--transition);
+}
+
+.sidebar-sub-link:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.sidebar-sub-link.is-active {
+  color: var(--accent);
+  background: rgba(16, 185, 129, 0.08);
+}
+
+.sidebar-bottom-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 8px;
+}
+
+/* ===== Layout With Sidebar (Drawer) ===== */
+.layout-with-sidebar {
+  width: 100%;
+  min-height: calc(100vh - 64px);
+  overflow-x: hidden;
+}
+
+.main-content {
+  width: 100%;
+  max-width: 100%;
 }
 
 /* ===== Loading & States ===== */
@@ -960,12 +976,14 @@ input {
 /* ===== Watch Page Layout ===== */
 .watch-page {
   padding: 0;
+  min-height: calc(100vh - 64px);
 }
 
 .watch-layout {
   display: flex;
   gap: 0;
   align-items: flex-start;
+  min-height: calc(100vh - 64px);
 }
 
 .watch-main {
@@ -979,7 +997,8 @@ input {
   flex-shrink: 0;
   position: sticky;
   top: 64px;
-  height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px);
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg-secondary);
@@ -992,6 +1011,14 @@ input {
   flex-shrink: 0;
 }
 
+.watch-sidebar-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
 .watch-sidebar-header h3 {
   font-size: 15px;
   font-weight: 700;
@@ -1000,6 +1027,79 @@ input {
 .watch-sidebar-header .text-muted {
   color: var(--text-muted);
   font-weight: 500;
+}
+
+.watch-sidebar-sort {
+  font-size: 12px;
+  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-secondary);
+  transition: var(--transition);
+  white-space: nowrap;
+}
+
+.watch-sidebar-sort:hover {
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+
+.watch-sidebar-search {
+  position: relative;
+}
+
+.watch-sidebar-search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.watch-sidebar-search input {
+  width: 100%;
+  height: 34px;
+  padding: 0 30px 0 32px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: var(--transition);
+}
+
+.watch-sidebar-search input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.watch-sidebar-search-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 4px;
+}
+
+.watch-sidebar-search-count {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  text-align: center;
 }
 
 .watch-sidebar-list {
@@ -1291,6 +1391,181 @@ input {
   }
 }
 
+/* Very small screens */
+@media (max-width: 420px) {
+  .hero {
+    height: 300px;
+  }
+  .hero-title {
+    font-size: 18px;
+  }
+  .hero-inner {
+    max-width: 100%;
+  }
+  .container {
+    padding: 0 12px;
+  }
+  .anime-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+  .anime-card-body {
+    padding: 6px;
+  }
+  .anime-card-title {
+    font-size: 12px;
+  }
+  .anime-card-meta {
+    font-size: 11px;
+  }
+  .section-title {
+    font-size: 16px;
+  }
+  .section {
+    padding: 16px 0;
+  }
+  .header-inner {
+    gap: 8px;
+  }
+  .header-search input {
+    height: 34px;
+    font-size: 12px;
+    padding: 0 12px 0 32px;
+  }
+  .header-search .search-icon {
+    left: 10px;
+    font-size: 12px;
+  }
+  .sidebar {
+    width: 220px;
+  }
+  .episode-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 6px;
+  }
+  .episode-btn {
+    padding: 8px 4px;
+    font-size: 12px;
+  }
+  .anime-detail-title {
+    font-size: 18px;
+  }
+  .anime-detail-poster {
+    width: 120px;
+  }
+  .anime-detail-header {
+    min-height: 240px;
+    padding-bottom: 16px;
+  }
+  .footer-inner {
+    flex-direction: column;
+    text-align: center;
+  }
+  .watch-sidebar {
+    max-height: 260px;
+  }
+  .watch-sidebar-ep {
+    padding: 6px 10px;
+  }
+  .watch-sidebar-ep-title {
+    font-size: 12px;
+  }
+  .player-info h2 {
+    font-size: 15px;
+  }
+  .server-type-tab {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  .server-tab {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+  .browse-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
+
+/* Extra small phones (360px and below) */
+@media (max-width: 380px) {
+  .container {
+    padding: 0 8px;
+  }
+  .header-inner {
+    gap: 4px;
+  }
+  .logo-img {
+    height: 36px;
+  }
+  .header-search input {
+    height: 30px;
+    font-size: 11px;
+    padding: 0 10px 0 28px;
+  }
+  .anime-grid {
+    gap: 6px;
+  }
+  .anime-card-body {
+    padding: 4px;
+  }
+  .anime-card-title {
+    font-size: 11px;
+  }
+  .anime-card-meta {
+    font-size: 10px;
+  }
+  .section-title {
+    font-size: 14px;
+  }
+  .hero-title {
+    font-size: 16px;
+  }
+  .hero {
+    height: 260px;
+  }
+  .menu-btn {
+    padding: 4px;
+  }
+  .menu-btn span {
+    width: 18px;
+    height: 2px;
+  }
+  .sidebar {
+    width: 200px;
+  }
+  .sidebar-link {
+    font-size: 12px;
+    padding: 8px 8px;
+  }
+  .anime-detail-title {
+    font-size: 16px;
+  }
+  .anime-detail-poster {
+    width: 100px;
+  }
+  .episode-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 4px;
+  }
+  .episode-btn {
+    padding: 6px 2px;
+    font-size: 11px;
+  }
+  .episode-btn .ep-num {
+    font-size: 13px;
+  }
+  .server-tabs {
+    gap: 4px;
+  }
+  .server-type-tab,
+  .server-tab {
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+}
+
 @media (max-width: 1024px) {
   .watch-layout {
     flex-direction: column;
@@ -1305,6 +1580,30 @@ input {
     max-height: 400px;
     border-left: none;
     border-top: 1px solid var(--border);
+  }
+  .watch-sidebar-header-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .watch-sidebar-sort {
+    font-size: 12px;
+    padding: 4px 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--text-secondary);
+    transition: var(--transition);
+  }
+  .watch-sidebar-sort:hover {
+    color: var(--text-primary);
+    border-color: var(--border-light);
   }
 }
 
@@ -1321,35 +1620,9 @@ input {
     height: auto;
     padding: 8px 0;
   }
-  .header-nav {
-    order: 2;
-    gap: 0;
-  }
-  .mobile-menu-btn {
-    display: flex;
-    order: 4;
-  }
-  .nav-dropdown {
-    position: static;
-  }
-  .header-nav {
-    position: static;
-  }
-  .nav-dropdown .dropdown-menu {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    transform: none;
-    max-width: 100%;
-    max-height: 100%;
-    border-radius: 0;
-    border: none;
-    padding-top: 64px;
-  }
-  .nav-dropdown.is-open .dropdown-menu {
-    transform: none;
+  .header-search input {
+    height: 36px;
+    font-size: 13px;
   }
 }
 
@@ -1362,18 +1635,30 @@ input {
   }
   .hero-synopsis {
     -webkit-line-clamp: 2;
+    font-size: 13px;
+  }
+  .hero-meta {
+    gap: 6px;
+  }
+  .hero-meta-item {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
+  .btn {
+    padding: 8px 16px;
+    font-size: 13px;
   }
   .header-search .search-shortcut {
     display: none;
   }
-  .header-nav a,
-  .dropdown-toggle {
-    padding: 6px 8px;
-    font-size: 12px;
+  .sidebar-link,
+  .sidebar-section-toggle {
+    padding: 8px 10px;
+    font-size: 13px;
   }
   .anime-grid {
     grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    gap: 10px;
   }
   .anime-card-body {
     padding: 8px;
@@ -1387,10 +1672,56 @@ input {
   .section-title {
     font-size: 18px;
   }
+  .section {
+    padding: 24px 0;
+  }
+  .section-header {
+    margin-bottom: 14px;
+  }
+  .anime-detail-header {
+    min-height: 280px;
+    padding-bottom: 24px;
+  }
+  .anime-detail-content {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+  }
+  .anime-detail-poster {
+    width: 140px;
+  }
   .anime-detail-title {
     font-size: 22px;
   }
+  .anime-detail-meta {
+    justify-content: center;
+  }
+  .anime-detail-genres {
+    justify-content: center;
+  }
+  .anime-detail-synopsis {
+    max-width: 100%;
+    font-size: 13px;
+  }
   .watch-sidebar {
     max-height: 300px;
+  }
+  .watch-sidebar-ep {
+    padding: 8px 12px;
+  }
+  .player-nav {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .player-nav-buttons {
+    width: 100%;
+    justify-content: center;
+  }
+  .player-info h2 {
+    font-size: 16px;
+  }
+  .container {
+    padding: 0 14px;
   }
 }

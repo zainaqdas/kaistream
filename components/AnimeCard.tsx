@@ -1,6 +1,12 @@
 import Link from 'next/link';
+import type { AnimeCardItem } from '@/types';
 
-export default function AnimeCard({ item, href }) {
+interface AnimeCardProps {
+  item: AnimeCardItem;
+  href?: string;
+}
+
+export default function AnimeCard({ item, href }: AnimeCardProps) {
   const linkHref = href || (item.slug ? `/anime/${item.slug}` : '#');
   const hasSub = item.episodes?.sub || item.hasSub;
   const hasDub = item.episodes?.dub || item.hasDub;

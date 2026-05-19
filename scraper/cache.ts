@@ -1,6 +1,8 @@
+import type { CacheEntry, CacheStats } from '@/types';
+
 /**
  * Simple in-memory TTL cache for scraper HTTP requests.
- * 
+ *
  * Default TTLs:
  *   - HTML pages (home, browse, anime detail): 30 minutes
  *   - Filters (genre list): 60 minutes (rarely changes)
@@ -10,7 +12,7 @@
  *   - External APIs (mapper): 60 minutes
  */
 
-const DEFAULT_TTLS = {
+const DEFAULT_TTLS: Record<string, Record<string, number>> = {
   html: {
     home: 30 * 60 * 1000,
     browse: 30 * 60 * 1000,
@@ -33,19 +35,16 @@ const DEFAULT_TTLS = {
 };
 
 class MemoryCache {
-  constructor() {
-    /** @type {Map<string, { data: any, timestamp: number }>} */
-    this._store = new Map();
-    this._hits = 0;
-    this._misses = 0;
-  }
+  private _store: Map<string, CacheEntry> = new Map();
+  private _hits: number = 0;
+  private _misses: number = 0;
 
   /**
    * Generate a cache key from the request parameters.
    */
-  _makeKey(type, path, params = {}) {
+  private _makeKey(type: string, path: string, params: Record<string, string | number> = {}): string {
     const paramStr = Object.keys(params).length > 0
-      ? '?' + new URLSearchParams(params).toString()
+      ? '?' + new URLSearchParams(params as Record<string, string>).toString()
       : '';
     return `${type}::${path}${paramStr}`;
   }
@@ -53,32 +52,20 @@ class MemoryCache {
   /**
    * Determine the TTL for a given request type and path.
    */
-  _getTTL(type, path) {
-    if (type === 'html') {
-      for (const [key, ttl] of Object.entries(DEFAULT_TTLS.html)) {
-        if (path.includes(key)) return ttl;
-      }
-      return DEFAULT_TTLS.html.default;
+  private _getTTL(type: string, path: string): number {
+    const config = DEFAULT_TTLS[type];
+    if (!config) return 30 * 60 * 1000;
+
+    for (const [key, ttl] of Object.entries(config)) {
+      if (path.includes(key)) return ttl;
     }
-    if (type === 'json') {
-      for (const [key, ttl] of Object.entries(DEFAULT_TTLS.json)) {
-        if (path.includes(key)) return ttl;
-      }
-      return DEFAULT_TTLS.json.default;
-    }
-    if (type === 'external') {
-      for (const [key, ttl] of Object.entries(DEFAULT_TTLS.external)) {
-        if (path.includes(key)) return ttl;
-      }
-      return DEFAULT_TTLS.external.default;
-    }
-    return 30 * 60 * 1000;
+    return config.default;
   }
 
   /**
    * Get a cached value. Returns null if not found or expired.
    */
-  get(type, path, params = {}) {
+  get(type: string, path: string, params: Record<string, string | number> = {}): unknown | null {
     const key = this._makeKey(type, path, params);
     const entry = this._store.get(key);
     if (!entry) {
@@ -97,7 +84,7 @@ class MemoryCache {
   /**
    * Set a value in the cache.
    */
-  set(type, path, params = {}, data) {
+  set(type: string, path: string, params: Record<string, string | number> = {}, data: unknown): unknown {
     const key = this._makeKey(type, path, params);
     this._store.set(key, { data, timestamp: Date.now() });
     return data;
@@ -108,18 +95,24 @@ class MemoryCache {
    * If cached and not expired, return cached.
    * Otherwise call fetcher, cache the result, return it.
    */
-  async getOrFetch(type, path, params, fetcher) {
+  async getOrFetch<T>(
+    type: string,
+    path: string,
+    params: Record<string, string | number>,
+    fetcher: () => Promise<T>
+  ): Promise<T> {
     const cached = this.get(type, path, params);
-    if (cached !== null) return cached;
+    if (cached !== null) return cached as T;
+
     const data = await fetcher();
-    return this.set(type, path, params, data);
+    this.set(type, path, params, data);
+    return data;
   }
 
   /**
    * Invalidate all entries matching a path prefix.
-   * E.g., invalidate('html', '/watch/') to clear all anime details.
    */
-  invalidate(type, pathPrefix) {
+  invalidate(type: string, pathPrefix: string): void {
     const prefix = `${type}::${pathPrefix}`;
     for (const key of this._store.keys()) {
       if (key.startsWith(prefix)) {
@@ -131,7 +124,7 @@ class MemoryCache {
   /**
    * Clear the entire cache.
    */
-  clear() {
+  clear(): void {
     this._store.clear();
     this._hits = 0;
     this._misses = 0;
@@ -140,14 +133,13 @@ class MemoryCache {
   /**
    * Get cache stats for monitoring.
    */
-  getStats() {
+  getStats(): CacheStats {
+    const total = this._hits + this._misses;
     return {
       size: this._store.size,
       hits: this._hits,
       misses: this._misses,
-      hitRate: this._hits + this._misses > 0
-        ? Math.round((this._hits / (this._hits + this._misses)) * 100)
-        : 0,
+      hitRate: total > 0 ? Math.round((this._hits / total) * 100) : 0,
     };
   }
 }

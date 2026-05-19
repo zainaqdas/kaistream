@@ -4,18 +4,19 @@ import { useState, useEffect } from 'react';
 import { getHome } from '@/lib/api';
 import Hero from '@/components/Hero';
 import AnimeCard from '@/components/AnimeCard';
+import type { HomeData } from '@/types';
 
 export default function HomePage() {
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
+  const [data, setData] = useState<HomeData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getHome()
       .then((res) => {
-        if (res.success) setData(res.data);
-        else setError(res.error);
+        if (res.success && res.data) setData(res.data);
+        else setError(res.error ?? 'Unknown error');
       })
-      .catch((err) => setError(err.message));
+      .catch((err: Error) => setError(err.message));
   }, []);
 
   if (error) {
@@ -52,7 +53,7 @@ export default function HomePage() {
           </div>
           <div className="anime-grid">
             {(data.latestEpisodes || []).map((item, i) => (
-              <AnimeCard key={item.slug || i} item={item} />
+              <AnimeCard key={item.slug || String(i)} item={item} />
             ))}
           </div>
         </div>
@@ -68,7 +69,7 @@ export default function HomePage() {
             </div>
             <div className="anime-grid">
               {(data.trending || []).map((item, i) => (
-                <AnimeCard key={item.slug || i} item={item} />
+                <AnimeCard key={item.slug || String(i)} item={item} />
               ))}
             </div>
           </div>

@@ -5,15 +5,16 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getEpisodeSources, getAnimeDetail } from '@/lib/api';
 import Player from '@/components/Player';
+import type { EpisodeSources, AnimeDetail, Episode } from '@/types';
 
 export default function WatchPage() {
   const params = useParams();
-  const slug = params.slug;
-  const episode = params.episode;
+  const slug = params.slug as string;
+  const episode = params.episode as string;
 
-  const [data, setData] = useState(null);
-  const [animeData, setAnimeData] = useState(null);
-  const [error, setError] = useState(null);
+  const [data, setData] = useState<EpisodeSources | null>(null);
+  const [animeData, setAnimeData] = useState<AnimeDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [sortAsc, setSortAsc] = useState(false);
   const [epSearch, setEpSearch] = useState('');
 
@@ -27,20 +28,16 @@ export default function WatchPage() {
       getAnimeDetail(slug),
     ])
       .then(([epRes, animeRes]) => {
-        if (epRes.success) setData(epRes.data);
-        else setError(epRes.error);
-        if (animeRes.success) setAnimeData(animeRes.data);
+        if (epRes.success && epRes.data) setData(epRes.data);
+        else setError(epRes.error ?? 'Unknown error');
+        if (animeRes.success && animeRes.data) setAnimeData(animeRes.data);
       })
-      .catch((err) => setError(err.message));
+      .catch((err: Error) => setError(err.message));
   }, [slug, episode]);
-
-  // When data loads, jump to the page containing the current episode
-  const epNum = parseInt(episode);
 
   const episodes = useMemo(() => {
     if (!animeData?.episodes?.length) return [];
     const sorted = [...animeData.episodes];
-    // Sort by episode number asc/desc
     sorted.sort((a, b) => {
       const aNum = a.episode || a.number || 0;
       const bNum = b.episode || b.number || 0;
@@ -48,7 +45,6 @@ export default function WatchPage() {
     });
     return sorted;
   }, [animeData, sortAsc]);
-
 
   // Filter episodes by search query
   const filteredEpisodes = useMemo(() => {
@@ -62,22 +58,21 @@ export default function WatchPage() {
 
   const visibleEpisodes = epSearch.trim() ? filteredEpisodes : episodes;
 
-  const prevEp =
-    epNum > 1 ? epNum - 1 : null;
-  const nextEp =
-    animeData && animeData.totalEpisodes > epNum ? epNum + 1 : null;
+  const epNum = parseInt(episode);
+  const prevEp = epNum > 1 ? epNum - 1 : null;
+  const nextEp = animeData && animeData.totalEpisodes > epNum ? epNum + 1 : null;
 
   const router = useRouter();
 
   // Clear search and jump to target episode
-  const handleEpSearchSubmit = (e) => {
+  const handleEpSearchSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const val = epSearch.trim();
     if (!val) return;
     const targetNum = parseInt(val, 10);
     if (!isNaN(targetNum)) {
       const idx = episodes.findIndex(
-        (ep) => String(ep.episode || ep.number) === String(targetNum)
+        (ep: Episode) => String(ep.episode || ep.number) === String(targetNum)
       );
       if (idx !== -1) {
         setEpSearch('');
@@ -177,7 +172,8 @@ export default function WatchPage() {
               <svg className="watch-sidebar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8" />
                 <path d="M21 21l-4.35-4.35" />
-              </svg>                <input
+              </svg>
+              <input
                 type="text"
                 placeholder="Search episode #..."
                 value={epSearch}
@@ -214,10 +210,7 @@ export default function WatchPage() {
                       <span className="watch-sidebar-ep-title">
                         {ep.title || `Episode ${eNum}`}
                       </span>
-                      <div className="watch-sidebar-ep-badges">
-                        {ep.hasSub && <span className="ep-badge sub">SUB</span>}
-                        {ep.hasDub && <span className="ep-badge dub">DUB</span>}
-                      </div>
+  
                     </div>
                   </Link>
                 );

@@ -1,7 +1,6 @@
-import { Suspense } from 'react';
+import { Suspense, ReactNode } from 'react';
 import './globals.css';
-import Header from '@/components/Header';
-import Footer from '@/components/Footer';
+import AppShell from '@/components/AppShell';
 
 export const metadata = {
   title: 'KaiStream - Watch Anime Online, Free Anime Streaming',
@@ -13,7 +12,7 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
@@ -26,10 +25,8 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         <Suspense fallback={null}>
-          <Header />
+          <AppShell>{children}</AppShell>
         </Suspense>
-        <main>{children}</main>
-        <Footer />
       </body>
     </html>
   );

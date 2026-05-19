@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { searchAnime } from '@/lib/api';
 import AnimeCard from '@/components/AnimeCard';
+import type { SearchData } from '@/types';
 
 export default function SearchPage() {
   return (
@@ -23,8 +24,8 @@ function SearchContent() {
   const searchParams = useSearchParams();
   const q = searchParams.get('q') || '';
 
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
+  const [data, setData] = useState<SearchData | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!q) return;
@@ -32,17 +33,17 @@ function SearchContent() {
     setError(null);
     searchAnime(q)
       .then((res) => {
-        if (res.success) setData(res.data);
-        else setError(res.error);
+        if (res.success && res.data) setData(res.data);
+        else setError(res.error ?? 'Unknown error');
       })
-      .catch((err) => setError(err.message));
+      .catch((err: Error) => setError(err.message));
   }, [q]);
 
   return (
     <div className="search-page">
       <div className="container">
         <h2>
-          Search results for: <span>"{q}"</span>
+          Search results for: <span>&ldquo;{q}&rdquo;</span>
         </h2>
 
         {error && (
@@ -71,7 +72,7 @@ function SearchContent() {
             </p>
             <div className="anime-grid">
               {data.results.map((item, i) => (
-                <AnimeCard key={item.slug || i} item={item} />
+                <AnimeCard key={item.slug || String(i)} item={item} />
               ))}
             </div>
           </>
@@ -79,7 +80,7 @@ function SearchContent() {
 
         {data && data.results && data.results.length === 0 && (
           <div className="empty-state">
-            <p style={{ fontSize: 16 }}>No results found for "{q}"</p>
+            <p style={{ fontSize: 16 }}>No results found for &ldquo;{q}&rdquo;</p>
             <p style={{ marginTop: 8, fontSize: 14 }}>
               Try different keywords or check the spelling.
             </p>
