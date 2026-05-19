@@ -19,7 +19,8 @@ const categoryLabels: Record<string, string> = {
 export default function BrowsePage() {
   const params = useParams();
   const pathParams = (params.params as string[]) || [];
-  const [category, value] = pathParams;
+  // Default to "popular" when no browse params provided
+  const [category, value] = pathParams.length > 0 ? pathParams : ['popular', ''];
 
   const [data, setData] = useState<BrowseResult | null>(null);
   const [error, setError] = useState<string | null>(null);

@@ -5,11 +5,12 @@ export const revalidate = 600;
 
 export async function GET(
   request: Request,
-  { params }: { params: { params: string[] } }
+  { params }: { params: { params: string[] | undefined } }
 ): Promise<Response> {
   const url = new URL(request.url);
   const page = parseInt(url.searchParams.get('page') || '1');
-  const [category, value] = params.params;
+  // Default to "popular" when no browse params provided
+  const [category = 'popular', value] = params.params || [];
 
   const validCategories = ['genre', 'type', 'status', 'latest', 'new', 'popular'];
   if (!validCategories.includes(category)) {
