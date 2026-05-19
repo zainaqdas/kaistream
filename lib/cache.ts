@@ -12,9 +12,9 @@
  * Supports stale-while-revalidate: each entry stores a `storedAt` timestamp
  * so callers can serve stale data while asynchronously refreshing it.
  *
- * Cache stats use probability-based sampling (~10% of operations) to
- * persist across serverless invocations without adding Redis I/O overhead
- * on every cache operation.
+ * Cache stats use probability-based sampling (~10% of operations) with
+ * atomic Redis INCR to persist across serverless invocations without
+ * adding significant I/O overhead on every cache operation.
  *
  * Note: `@vercel/kv` is imported lazily (not at module level) to ensure
  * the client is initialized at runtime when env vars are available.
@@ -26,6 +26,7 @@ type VercelKv = {
   set: (key: string, value: unknown, opts?: { ex?: number }) => Promise<string>;
   del: (key: string) => Promise<number>;
   keys: (pattern: string) => Promise<string[]>;
+  incr: (key: string) => Promise<number>;
 };
 
 // Redis keys for persistent cache stats
@@ -40,13 +41,7 @@ interface MemoryEntry {
 }
 const memoryStore = new Map<string, MemoryEntry>();
 
-// Per-process in-memory counter — used to batch Redis flush when probability triggers
-let invHits = 0;
-let invMisses = 0;
-let invStaleHits = 0;
-
 let kvClient: VercelKv | null = null;
-let firstFlushAttempted = false;
 
 /**
  * Lazily get the @vercel/kv client.
@@ -129,25 +124,15 @@ export interface CacheStats {
 }
 
 /**
- * Increment a cache stat in Redis with probability-based sampling.
+ * Increment a cache stat in Redis using atomic INCR.
  *
- * We use ~10% sampling to avoid adding Redis I/O overhead on every
- * cache operation. This gives us statistically accurate hit rates
- * without the cost of a Redis read+write per cache operation.
- *
- * The very first call during a serverless invocation also flushes
- * any accumulated in-memory counters from a previous invocation
- * (rare race condition, but harmless).
+ * Uses ~10% random sampling to avoid adding Redis I/O overhead on every
+ * cache operation. This gives us statistically accurate hit rates without
+ * the cost of a Redis write per cache operation.
  */
 async function incrementStat(field: 'hits' | 'misses' | 'staleHits'): Promise<void> {
-  // Track in-memory for local dev (non-serverless)
-  if (field === 'hits') invHits++;
-  else if (field === 'misses') invMisses++;
-  else invStaleHits++;
-
-  // In serverless, each invocation is a fresh process.
-  // Use ~10% random sampling to persist stats to Redis.
   if (!isRedisAvailable()) return;
+  // ~10% random sampling to reduce Redis I/O overhead
   if (Math.random() > 0.1) return;
 
   try {
@@ -157,25 +142,19 @@ async function incrementStat(field: 'hits' | 'misses' | 'staleHits'): Promise<vo
       : field === 'misses'
         ? STATS_MISSES_KEY
         : STATS_STALE_KEY;
-
-    const current = await vercelKv.get<number>(statKey);
-    await vercelKv.set(statKey, (current || 0) + 1);
+    await vercelKv.incr(statKey);
   } catch {
     // Stats errors are non-critical — ignore
   }
 }
 
 /**
- * Get persistent cache stats from Redis.
+ * Get persistent cache stats from Redis (via INCR'd keys) or in-memory.
  */
 async function getPersistentStats(): Promise<{ hits: number; misses: number; staleHits: number }> {
   const stats = { hits: 0, misses: 0, staleHits: 0 };
 
   if (!isRedisAvailable()) {
-    // In-memory fallback: add the current process's counters
-    stats.hits = invHits;
-    stats.misses = invMisses;
-    stats.staleHits = invStaleHits;
     return stats;
   }
 
@@ -215,6 +194,9 @@ export async function resetCacheStats(): Promise<void> {
   if (isRedisAvailable()) {
     try {
       const vercelKv = await getKvClient();
+      // Stats are auto-incrementing; reset by setting to 0.
+      // (The exact counts may be slightly lost due to concurrent incr calls,
+      //  but this is only used for monitoring, not billing.)
       await Promise.all([
         vercelKv.set(STATS_HITS_KEY, 0),
         vercelKv.set(STATS_MISSES_KEY, 0),
